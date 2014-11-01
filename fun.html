@@ -1,0 +1,200 @@
+<head>
+<script type="text/javascript" src = "math.min.js"></script>
+<!--shades-->
+<script id="shader-vs" type="x-shader/x-vertex">
+attribute vec2 cVertex;//quad vetices
+varying vec3 dir;//eye ray direction
+uniform float fov;//field of view, camera param
+uniform float ratio;//xres/yres
+uniform mat3 rtrans;//translate eye ray from camera space to world space
+void main(void) {
+	float fov_factor = tan( radians( fov /2.0) ) ;
+	gl_Position =  vec4(cVertex, 0, 1.0);
+	dir = rtrans * vec3( cVertex.x * fov_factor * ratio, cVertex.y * fov_factor, 1);//generate eye ray
+}
+</script>
+
+<script id="shader-fs" type="x-shader/x-fragment">
+precision mediump float;
+uniform vec3 cameraPos;//camera position
+varying vec3 dir;//eye ray direction
+const int bounce = 3;//max bounce time
+const float epsilon = 0.001;//tolerance
+uniform vec3 rot, rotv;
+
+uniform sampler2D texture_wall;
+
+//temporal vars
+const vec3 lightSource = vec3(-8, 8, -2);//position of light
+const vec3 sphere1Center = vec3(0, 0, 0);
+const float r = 1.0;//radius of sphere;
+const vec3 roomMin = vec3(-10, -10, -20), roomMax = vec3(10, 10, 20);//room box defined with "slab" algorithm
+
+//some uti
+const int X = 0, Y = 1, Z = 2;
+mat3 getRotMat(float degree, int choice){
+	float rad = radians(degree);
+	if(choice == X)
+		return 	mat3(1, 0, 0, 0, cos(rad), -sin(rad), 0, sin(rad), cos(rad));
+	else if ( choice == Y )
+		return mat3(cos(rad), 0, sin(rad), 0, 1, 0, -sin(rad), 0, cos(rad));
+	else return mat3(1, 0, 0, 0, 1, 0, 0, 0, 1);
+}
+
+vec2 intersectBox(vec3 origin, vec3 dir, vec3 boxMin, vec3 boxMax){//ray box intersect
+	vec3 tMin = (boxMin - origin) / dir;
+	vec3 tMax = (boxMax - origin) / dir;
+	vec3 t1 = min(tMin, tMax);
+	vec3 t2 = max(tMin, tMax);
+	float tNear = max(max(t1.x, t1.y), t1.z);
+	float tFar = min(min(t2.x, t2.y), t2.z);
+	return vec2(tNear, tFar);
+}
+
+vec3 normalForBox(vec3 hit, vec3 boxMin, vec3 boxMax){
+	if(hit.x < boxMin.x + epsilon ) return vec3(-1.0, 0.0, 0.0);//box left
+	else if(hit.x > boxMax.x -  epsilon) return vec3(1.0, 0.0, 0.0);//box right
+	else if(hit.y < boxMin.y +  epsilon ) return vec3(0.0, -1.0, 0.0);//box bottom
+	else if(hit.y > boxMax.y - epsilon) return vec3(0.0, 1.0, 0.0);//box top
+	else if(hit.z < boxMin.z + epsilon ) return vec3(0.0, 0.0, -1.0);//box front
+	else return vec3(0.0, 0.0, 1.0);//box back
+	return vec3(0.0, 0.0, 1.0);
+}
+bool intersectSphere(vec3 center, vec3 origin, vec3 dir, out float dist) {
+	vec3 c = center - origin;
+	float b = dot(dir, c);
+	if(b < 0.0)
+	return false;
+	float d = dot(c, c) - b*b;
+	if(d < 0.0 || d > r*r)
+	return false;
+	dist = b- sqrt(r*r- d);
+	return true;
+}
+
+vec3 ambient(vec3 color){
+	return color;
+}
+vec3 diffuse(vec3 L, vec3 N, vec3 color){
+	return dot(L, N) * color;
+}
+vec3 specular(vec3 L, vec3 N, vec3 V, vec3 color){
+	vec3 R = reflect(L, N);
+	return pow(max(dot(R, V), 0.0), 30.0) * color;
+}
+
+//simple map test !!!
+vec2 mapfoo(vec3 pos){
+	pos.x = 0.0;//no use
+	pos.y /= roomMax.y - roomMin.y;
+	pos.z /= roomMax.z - roomMin.z;
+	pos += 0.5;
+	pos.y = 1.0 - pos.y;
+	return pos.yz;
+}
+
+vec3 lightAt(vec3 hit, vec3 N, vec3 V, int obj)//calculate light at a object point
+{
+	//vec3 L = lightSource;
+	vec3 ka = vec3(0.3), ks = vec3(0.4), kd = vec3(0.3);
+	vec3 L = normalize(lightSource - hit);//use point light
+	vec3 R = reflect(L, N);
+	vec3 c = vec3(0);
+	vec2 uv;
+
+	if(obj == 0)
+	kd = ka = vec3(0, 0, 0.5);
+	else if(abs(N.x) == 1.0)
+		kd = ka = texture2D(texture_wall, mapfoo(hit)).xyz;
+	else if(N.y == 1.0)
+		{ks = ka = vec3(1); kd = vec3(0);}
+	else
+		kd = ka = vec3(0.5, 0, 0);
+
+	c += ambient(vec3(0.2)) * ka;
+
+	float dist;
+	vec3 stoLight;
+
+	stoLight = lightSource - hit;
+
+	if(intersectSphere(sphere1Center, hit , normalize(stoLight), dist)  && dist < length(stoLight) )//intersect any object, blocked
+		return c;
+	c += diffuse(L, N, vec3(1) )* kd;
+	c += specular(L, N, V, vec3(1) )*  ks;
+
+	return c;
+}
+
+vec3 intersect(vec3 origin, vec3 dir){//main ray bounce function
+	vec3 color = vec3(0),ncolor, norm, hit, stoLight;
+	vec3 dl, al, sl;
+	vec2 room;
+	bool stop = false;
+	float dist;
+	
+	for(int i = 0; i < bounce; i++){
+		if(stop)
+			break;
+		if(intersectSphere(sphere1Center, origin, dir, dist)){
+			hit = origin + dist * dir;
+			norm = normalize(hit - sphere1Center);
+			ncolor = lightAt(hit, norm, dir, 0);
+			stop = true;
+		}
+		else{//wall can't block sphere
+			room = intersectBox(origin,dir, roomMin,roomMax);
+			if(room.x <= room.y){//hit box
+				hit = origin + room.y * dir;
+				norm = normalForBox(hit, roomMin, roomMax);
+				ncolor = lightAt(hit, -norm, dir, 1);//calculate inner color
+				dist = room.y;
+				stop = hit.y < roomMin.y + epsilon ? false : true;
+			}
+		}
+		color = i==0 ? ncolor : color * 0.5 +  ncolor * 0.5;
+		//generate new ray
+		origin = origin + dist * dir;
+		dir = reflect(dir, norm);
+	}
+/*	for(int i = 0; i < bounce; i++){//test bounding box
+		if(stop)
+		break;
+
+		room = intersectBox(origin,dir, roomMin,roomMax);
+		if(room.x <= room.y){//hit box
+			hit = origin + room.y * dir;
+			norm = normalForBox(hit, roomMin, roomMax);
+			ncolor = lightAt(-norm, -dir, vec3(0,1,0));//calculate inner color
+			dist = room.y;
+			stop = hit.y < roomMin.y + epsilon ? true : true;
+		}
+		color = i==0 ? ncolor : color * 0.8 +  ncolor * 0.2;
+		origin = origin + dist * dir;
+		dir = reflect(dir, norm);
+	}*/
+	return color;
+}
+
+const int SAMPLE_NUM = 24;
+void main(void) {
+	vec3 cameraDir, color = vec3(0);
+	float fi;
+	for(int i = 0; i < SAMPLE_NUM; ++i){
+		fi = float(i) / float(SAMPLE_NUM) / 12.;
+		cameraDir = normalize(getRotMat(rot.x + rotv.x * fi , X) * getRotMat(rot.y + rotv.y * fi, Y)  * dir);
+		color += intersect(cameraPos, cameraDir) / float(SAMPLE_NUM);		
+	}
+
+	gl_FragColor = vec4(color, 1);
+}
+</script>
+<script type = "text/javascript"  src = "fun_uti.js"></script>
+<script type = "text/javascript" src = "fun_render.js"></script>
+<script type = "text/javascript"  src = "fun_gui.js"></script>
+<script type = "text/javascript" src = "fun_main.js"></script>
+</script>
+</head>
+<body>
+<canvas id = "canv"></canvas>
+</body>
