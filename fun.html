@@ -17,25 +17,41 @@ void main(void) {
 <script id="shader-fs" type="x-shader/x-fragment">
 precision mediump float;
 
-//data structure
+//data structures
 struct Ray{
 	vec3 dir;
 	vec3 origin;
 };
 
+struct Sphere{
+	vec3 pos;
+	float rad;
+};
+
+struct Box{
+	vec3 min;
+	vec3 max;
+};
+struct Light{
+	vec3 posOrDir;//positional light use pos while directional light use direction
+	bool isDirectional;
+	vec3 Is;//specular intensity
+	vec3 Id;//diffuse intensity
+};
+
+uniform vec3 rot, rotv;//motion blur speed
 uniform vec3 cameraPos;//camera position
 varying vec3 dir;//eye ray direction
 const int bounce = 3;//max bounce time
 const float epsilon = 0.001;//tolerance
-uniform vec3 rot, rotv;
+
 
 uniform sampler2D texture_wall;
 
 //temporal vars
-const vec3 lightSource = vec3(-8, 8, -2);//position of light
-const vec3 sphere1Center = vec3(0, 0, 0);
-const float r = 1.0;//radius of sphere;
-const vec3 roomMin = vec3(-10, -10, -20), roomMax = vec3(10, 10, 20);//room box defined with "slab" algorithm
+const Sphere sphere1 = Sphere(vec3(0, 0, 0), 1.);
+const Light light1 = Light(vec3(-8, 8, -2), false, vec3(1.), vec3(1.));
+const Box room = Box(vec3(-10, -10, -20), vec3(10, 10, 20));
 
 //some uti
 const int X = 0, Y = 1, Z = 2;
@@ -48,9 +64,9 @@ mat3 getRotMat(float degree, int choice){
 	else return mat3(1, 0, 0, 0, 1, 0, 0, 0, 1);
 }
 
-vec2 intersectBox(Ray eyeRay, vec3 boxMin, vec3 boxMax){//ray box intersect
-	vec3 tMin = (boxMin - eyeRay.origin) / eyeRay.dir;
-	vec3 tMax = (boxMax - eyeRay.origin) / eyeRay.dir;
+vec2 intersectBox(Ray eyeRay, Box box){//ray box intersect
+	vec3 tMin = (box.min - eyeRay.origin) / eyeRay.dir;
+	vec3 tMax = (box.max - eyeRay.origin) / eyeRay.dir;
 	vec3 t1 = min(tMin, tMax);
 	vec3 t2 = max(tMin, tMax);
 	float tNear = max(max(t1.x, t1.y), t1.z);
@@ -58,43 +74,44 @@ vec2 intersectBox(Ray eyeRay, vec3 boxMin, vec3 boxMax){//ray box intersect
 	return vec2(tNear, tFar);
 }
 
-vec3 normalForBox(vec3 hit, vec3 boxMin, vec3 boxMax){
-	if(hit.x < boxMin.x + epsilon ) return vec3(-1.0, 0.0, 0.0);//box left
-	else if(hit.x > boxMax.x -  epsilon) return vec3(1.0, 0.0, 0.0);//box right
-	else if(hit.y < boxMin.y +  epsilon ) return vec3(0.0, -1.0, 0.0);//box bottom
-	else if(hit.y > boxMax.y - epsilon) return vec3(0.0, 1.0, 0.0);//box top
-	else if(hit.z < boxMin.z + epsilon ) return vec3(0.0, 0.0, -1.0);//box front
+vec3 normalForBox(vec3 hit, Box box){
+	if(hit.x < box.min.x + epsilon ) return vec3(-1.0, 0.0, 0.0);//box left
+	else if(hit.x > box.max.x -  epsilon) return vec3(1.0, 0.0, 0.0);//box right
+	else if(hit.y < box.min.y +  epsilon ) return vec3(0.0, -1.0, 0.0);//box bottom
+	else if(hit.y > box.max.y - epsilon) return vec3(0.0, 1.0, 0.0);//box top
+	else if(hit.z < box.min.z + epsilon ) return vec3(0.0, 0.0, -1.0);//box front
 	else return vec3(0.0, 0.0, 1.0);//box back
 	return vec3(0.0, 0.0, 1.0);
 }
-bool intersectSphere(Ray eyeRay, out float dist) {
-	vec3 c = sphere1Center - eyeRay.origin;
+
+bool intersectSphere(Sphere sphere, Ray eyeRay, out float dist) {
+	vec3 c = sphere.pos - eyeRay.origin;
 	float b = dot(eyeRay.dir, c);
 	if(b < 0.0)
 	return false;
 	float d = dot(c, c) - b*b;
-	if(d < 0.0 || d > r*r)
+	if(d < 0.0 || d > sphere.rad * sphere.rad)
 	return false;
-	dist = b- sqrt(r*r- d);
+	dist = b- sqrt(sphere.rad * sphere.rad- d);
 	return true;
 }
 
 vec3 ambient(vec3 color){
 	return color;
 }
-vec3 diffuse(vec3 L, vec3 N, vec3 color){
-	return dot(L, N) * color;
+vec3 diffuse(vec3 L, vec3 N, vec3 Id){
+	return dot(L, N) * Id;
 }
-vec3 specular(vec3 L, vec3 N, vec3 V, vec3 color){
+vec3 specular(vec3 L, vec3 N, vec3 V, vec3 Is){
 	vec3 R = reflect(L, N);
-	return pow(max(dot(R, V), 0.0), 30.0) * color;
+	return pow(max(dot(R, V), 0.0), 30.0) * Is;
 }
 
 //simple map test !!!
 vec2 mapfoo(vec3 pos){
 	pos.x = 0.0;//no use
-	pos.y /= roomMax.y - roomMin.y;
-	pos.z /= roomMax.z - roomMin.z;
+	pos.y /= room.max.y - room.min.y;
+	pos.z /= room.max.z - room.min.z;
 	pos += 0.5;
 	pos.y = 1.0 - pos.y;
 	return pos.yz;
@@ -104,11 +121,10 @@ vec3 lightAt(vec3 hit, vec3 N, vec3 V, int obj)//calculate light at a object poi
 {
 	//vec3 L = lightSource;
 	vec3 ka = vec3(0.3), ks = vec3(0.4), kd = vec3(0.3);
-	vec3 L = normalize(lightSource - hit);//use point light
+	vec3 L = normalize(light1.posOrDir - hit);//use point light
 	vec3 R = reflect(L, N);
 	vec3 c = vec3(0);
 	vec2 uv;
-
 	if(obj == 0)
 	kd = ka = vec3(0, 0, 0.5);
 	else if(abs(N.x) == 1.0)
@@ -122,13 +138,13 @@ vec3 lightAt(vec3 hit, vec3 N, vec3 V, int obj)//calculate light at a object poi
 
 	float dist;
     
-    Ray shadowRay = Ray(normalize(lightSource - hit), hit);
+    Ray shadowRay = Ray(normalize(light1.posOrDir - hit), hit);
 
 	//shadow
-	if(intersectSphere(shadowRay, dist)  && dist < length(shadowRay.dir) )//intersect any object, blocked
+	if(intersectSphere(sphere1,shadowRay, dist)  && dist < length(shadowRay.dir) )//intersect any object, blocked
 		return c;
-	c += diffuse(L, N, vec3(1) )* kd;
-	c += specular(L, N, V, vec3(1) )*  ks;
+	c += diffuse(L, N, light1.Id )* kd;
+	c += specular(L, N, V, light1.Is )*  ks;
 
 	return c;
 }
@@ -136,27 +152,27 @@ vec3 lightAt(vec3 hit, vec3 N, vec3 V, int obj)//calculate light at a object poi
 vec3 intersect(Ray eyeRay){//main ray bounce function
 	vec3 color = vec3(0),ncolor, norm, hit, stoLight;
 	vec3 dl, al, sl;
-	vec2 room;
+	vec2 roomHits;
 	bool stop = false;
 	float dist;
 	
 	for(int i = 0; i < bounce; i++){
 		if(stop)
 			break;
-		if(intersectSphere(eyeRay, dist)){
+		if(intersectSphere(sphere1, eyeRay, dist)){
 			hit = eyeRay.origin + dist * eyeRay.dir;
-			norm = normalize(hit - sphere1Center);
+			norm = normalize(hit - sphere1.pos);
 			ncolor = lightAt(hit, norm, eyeRay.dir, 0);
 			stop = true;
 		}
 		else{//wall can't block sphere
-			room = intersectBox(eyeRay, roomMin,roomMax);
-			if(room.x <= room.y){//hit box
-				hit = eyeRay.origin + room.y * eyeRay.dir;
-				norm = normalForBox(hit, roomMin, roomMax);
+			roomHits = intersectBox(eyeRay, room);
+			if(roomHits.x <= roomHits.y){//hit box
+				hit = eyeRay.origin + roomHits.y * eyeRay.dir;
+				norm = normalForBox(hit, room);
 				ncolor = lightAt(hit, -norm, eyeRay.dir, 1);//calculate inner color
-				dist = room.y;
-				stop = hit.y < roomMin.y + epsilon ? false : true;
+				dist = roomHits.y;
+				stop = hit.y < room.min.y + epsilon ? false : true;
 			}
 		}
 		color = i==0 ? ncolor : color * 0.5 +  ncolor * 0.5;
