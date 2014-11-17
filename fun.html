@@ -16,6 +16,13 @@ void main(void) {
 
 <script id="shader-fs" type="x-shader/x-fragment">
 precision mediump float;
+
+//data structure
+struct Ray{
+	vec3 dir;
+	vec3 origin;
+};
+
 uniform vec3 cameraPos;//camera position
 varying vec3 dir;//eye ray direction
 const int bounce = 3;//max bounce time
@@ -41,9 +48,9 @@ mat3 getRotMat(float degree, int choice){
 	else return mat3(1, 0, 0, 0, 1, 0, 0, 0, 1);
 }
 
-vec2 intersectBox(vec3 origin, vec3 dir, vec3 boxMin, vec3 boxMax){//ray box intersect
-	vec3 tMin = (boxMin - origin) / dir;
-	vec3 tMax = (boxMax - origin) / dir;
+vec2 intersectBox(Ray eyeRay, vec3 boxMin, vec3 boxMax){//ray box intersect
+	vec3 tMin = (boxMin - eyeRay.origin) / eyeRay.dir;
+	vec3 tMax = (boxMax - eyeRay.origin) / eyeRay.dir;
 	vec3 t1 = min(tMin, tMax);
 	vec3 t2 = max(tMin, tMax);
 	float tNear = max(max(t1.x, t1.y), t1.z);
@@ -60,9 +67,9 @@ vec3 normalForBox(vec3 hit, vec3 boxMin, vec3 boxMax){
 	else return vec3(0.0, 0.0, 1.0);//box back
 	return vec3(0.0, 0.0, 1.0);
 }
-bool intersectSphere(vec3 center, vec3 origin, vec3 dir, out float dist) {
-	vec3 c = center - origin;
-	float b = dot(dir, c);
+bool intersectSphere(Ray eyeRay, out float dist) {
+	vec3 c = sphere1Center - eyeRay.origin;
+	float b = dot(eyeRay.dir, c);
 	if(b < 0.0)
 	return false;
 	float d = dot(c, c) - b*b;
@@ -114,11 +121,11 @@ vec3 lightAt(vec3 hit, vec3 N, vec3 V, int obj)//calculate light at a object poi
 	c += ambient(vec3(0.2)) * ka;
 
 	float dist;
-	vec3 stoLight;
+    
+    Ray shadowRay = Ray(normalize(lightSource - hit), hit);
 
-	stoLight = lightSource - hit;
-
-	if(intersectSphere(sphere1Center, hit , normalize(stoLight), dist)  && dist < length(stoLight) )//intersect any object, blocked
+	//shadow
+	if(intersectSphere(shadowRay, dist)  && dist < length(shadowRay.dir) )//intersect any object, blocked
 		return c;
 	c += diffuse(L, N, vec3(1) )* kd;
 	c += specular(L, N, V, vec3(1) )*  ks;
@@ -126,7 +133,7 @@ vec3 lightAt(vec3 hit, vec3 N, vec3 V, int obj)//calculate light at a object poi
 	return c;
 }
 
-vec3 intersect(vec3 origin, vec3 dir){//main ray bounce function
+vec3 intersect(Ray eyeRay){//main ray bounce function
 	vec3 color = vec3(0),ncolor, norm, hit, stoLight;
 	vec3 dl, al, sl;
 	vec2 room;
@@ -136,26 +143,26 @@ vec3 intersect(vec3 origin, vec3 dir){//main ray bounce function
 	for(int i = 0; i < bounce; i++){
 		if(stop)
 			break;
-		if(intersectSphere(sphere1Center, origin, dir, dist)){
-			hit = origin + dist * dir;
+		if(intersectSphere(eyeRay, dist)){
+			hit = eyeRay.origin + dist * eyeRay.dir;
 			norm = normalize(hit - sphere1Center);
-			ncolor = lightAt(hit, norm, dir, 0);
+			ncolor = lightAt(hit, norm, eyeRay.dir, 0);
 			stop = true;
 		}
 		else{//wall can't block sphere
-			room = intersectBox(origin,dir, roomMin,roomMax);
+			room = intersectBox(eyeRay, roomMin,roomMax);
 			if(room.x <= room.y){//hit box
-				hit = origin + room.y * dir;
+				hit = eyeRay.origin + room.y * eyeRay.dir;
 				norm = normalForBox(hit, roomMin, roomMax);
-				ncolor = lightAt(hit, -norm, dir, 1);//calculate inner color
+				ncolor = lightAt(hit, -norm, eyeRay.dir, 1);//calculate inner color
 				dist = room.y;
 				stop = hit.y < roomMin.y + epsilon ? false : true;
 			}
 		}
 		color = i==0 ? ncolor : color * 0.5 +  ncolor * 0.5;
 		//generate new ray
-		origin = origin + dist * dir;
-		dir = reflect(dir, norm);
+		eyeRay.origin = eyeRay.origin + dist * eyeRay.dir;
+		eyeRay.dir = reflect(eyeRay.dir, norm);
 	}
 /*	for(int i = 0; i < bounce; i++){//test bounding box
 		if(stop)
@@ -179,11 +186,13 @@ vec3 intersect(vec3 origin, vec3 dir){//main ray bounce function
 const int SAMPLE_NUM = 24;
 void main(void) {
 	vec3 cameraDir, color = vec3(0);
+	Ray eyeRay;
 	float fi;
 	for(int i = 0; i < SAMPLE_NUM; ++i){
 		fi = float(i) / float(SAMPLE_NUM) / 12.;
 		cameraDir = normalize(getRotMat(rot.x + rotv.x * fi , X) * getRotMat(rot.y + rotv.y * fi, Y)  * dir);
-		color += intersect(cameraPos, cameraDir) / float(SAMPLE_NUM);		
+		eyeRay = Ray(cameraDir, cameraPos);
+		color += intersect(eyeRay) / float(SAMPLE_NUM);		
 	}
 
 	gl_FragColor = vec4(color, 1);
