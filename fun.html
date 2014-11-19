@@ -45,14 +45,18 @@ struct Light{
 
 uniform vec3 rot, rotv;//motion blur speed
 uniform vec3 cameraPos;//camera position
+uniform float time;
 uniform sampler2D texture_wall;
 varying vec3 dir;//eye ray direction
 //const setting
+const int INT_MAX = 2147483647;
 const int bounce = 3;//max bounce time
 const float epsilon = 0.001;//tolerance
 const int X = 0, Y = 1, Z = 2;
-vec2 seed = vec2(1,1);
-const int SAMPLE_NUM = 4;
+const int SAMPLE_GRID = 1;//2 ^ SAMPLE_NUM
+const int SAMPLE_NUM = SAMPLE_GRID * SAMPLE_GRID;
+float s;//seed for random generator
+
 //temporal vars
 const Sphere sphere1 = Sphere(vec3(0, 0, 0), 1.);
 const Light light1 = Light(vec3(-10, 9.5, -0.5), vec3(0, 1, 1), false, LIGHT_AREA, vec3(1.), vec3(1.));
@@ -68,14 +72,13 @@ mat3 getRotMat(float degree, int choice){
 	else return mat3(1, 0, 0, 0, 1, 0, 0, 0, 1);
 }
 
-highp float rand(vec2 co)
-{
-    highp float a = 12.9898;
-    highp float b = 78.233;
-    highp float c = 43758.5453;
-    highp float dt= dot(co.xy ,vec2(a,b));
-    highp float sn= mod(dt,3.14);
-    return fract(sin(sn) * c);
+//random function from [Antialiasing by Justaway]
+void srand(vec2 p){
+	s =sin(dot(p,vec2(423.62431,321.54323)));
+}
+float rand(){
+	s=fract(s*32322.65432+0.12333);
+	return abs(fract(s));
 }
 
 bool intersectBox(Ray eyeRay,Box box, out float dist){//ray box intersect
@@ -156,9 +159,9 @@ vec3 lightAt(vec3 hit, vec3 N, vec3 V, int obj)//calculate light at a object poi
 	float dist;
     
     //shadow
-    for(int i =0; i < SAMPLE_NUM; i++){
-    	Ray shadowRay = Ray(normalize(light1.posOrDir +  rand(seed) *light1.size - hit), hit);
-    	seed += vec2(1,1);
+    for(int i = 0; i < SAMPLE_NUM; i++){
+    	vec3 grid = light1.size * vec3(i / SAMPLE_GRID, mod(float(i),float(SAMPLE_GRID)), 0); 
+    	Ray shadowRay = Ray(normalize(light1.posOrDir +  rand()*light1.size * 0.25 - hit), hit);
     	if(intersectSphere(sphere1,shadowRay, dist)  && dist > 0.)//intersect any object, blocked
 			continue;
 		c += diffuse(L, N, light1.Id )* kd / float(SAMPLE_NUM);
@@ -204,8 +207,9 @@ void main(void) {
 	vec3 cameraDir, color = vec3(0);
 	Ray eyeRay;
 	float fi;
+	srand(dir.xy);
 	for(int i = 0; i < SAMPLE_NUM; ++i){
-		fi = float(i) / float(SAMPLE_NUM) / 24.;
+		fi = rand() / 24.;
 		cameraDir = normalize(getRotMat(rot.x + rotv.x * fi , X) * getRotMat(rot.y + rotv.y * fi, Y)  * dir);
 		eyeRay = Ray(cameraDir, cameraPos);
 		color += intersect(eyeRay) / float(SAMPLE_NUM);		

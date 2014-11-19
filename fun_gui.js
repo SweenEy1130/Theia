@@ -13,6 +13,7 @@ var Gui = {
 	mouseUp: function(e){
 		Gui.drag = false;
 		Gui.oldPos = [-1, -1];
+		Camera.rotv = [0, 0, 0];
 	},
 	mouseMove : function (e) {
 		if(Gui.drag){
@@ -36,11 +37,11 @@ var Gui = {
 		{
 			case 38://UP
 			case 87:
-				Camera.pos[2] += Camera.rotate[1] < 90 && Camera.rotate[1] > -90 ? 0.5 : -0.5;
+				Camera.pos[2] += Camera.rotate[1] < 90 && Camera.rotate[1] > -90 ? 0.1 : -0.1;
 				break;
 			case 40://DOWN
 			case 83:
-				Camera.pos[2] += Camera.rotate[1] < 90 && Camera.rotate[1] > -90 > 0 ? -0.5 : 0.5 ;
+				Camera.pos[2] += Camera.rotate[1] < 90 && Camera.rotate[1] > -90 > 0 ? -0.1 : 0.1 ;
 				break;
 		}
 		Render.updateShaderParams(gl);

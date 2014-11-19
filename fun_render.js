@@ -29,6 +29,7 @@ var Camera = {
 var Render = {
 	program : null,
 	texture : null,
+	time : 0,
 	getShaderProgram : function(gl){
 		var fragmentShader = this.getShader(gl, "shader-fs", gl.FRAGMENT_SHADER);
 		var vertexShader = this.getShader(gl, "shader-vs", gl.VERTEX_SHADER);
@@ -75,6 +76,10 @@ var Render = {
  	 	gl.uniform3fv(gl.getUniformLocation(this.program, "rotv"), Camera.rotv);
  	 },
 
+ 	 updateTime: function()
+ 	 {
+ 	 	gl.uniform1f(gl.getUniformLocation(this.program, "time"), this.time);
+ 	 },
  	 getTexture : function(){
 
  	 	var image = new Image();

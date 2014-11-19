@@ -10,6 +10,10 @@ function init(){
 	canvas.addEventListener("mouseup", Gui.mouseUp, false);
 	canvas.addEventListener("mouseout", Gui.mouseUp, false);
 	document.addEventListener("keydown", Gui.keyDown, false);
+	setInterval(function(){
+		Render.time++;
+
+	}, 1);
 
 	//get gl object
 	try{
