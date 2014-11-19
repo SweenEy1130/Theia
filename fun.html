@@ -16,7 +16,7 @@ void main(void) {
 	dir = rtrans * vec3( cVertex.x * fov_factor * ratio, cVertex.y * fov_factor, 1);//generate eye ray
 }
 </script>
-
+	
 <script id="shader-fs" type="x-shader/x-fragment">
 precision mediump float;
 //data structures
@@ -32,9 +32,13 @@ struct Box{
 	vec3 min;
 	vec3 max;
 };
+
+const int LIGHT_AREA = 1;
 struct Light{
 	vec3 posOrDir;//positional light use pos while directional light use direction
+	vec3 size;//radius for sphere light
 	bool isDirectional;
+	int type;//sphere light or area light
 	vec3 Is;//specular intensity
 	vec3 Id;//diffuse intensity
 };
@@ -47,9 +51,11 @@ varying vec3 dir;//eye ray direction
 const int bounce = 3;//max bounce time
 const float epsilon = 0.001;//tolerance
 const int X = 0, Y = 1, Z = 2;
+vec2 seed = vec2(1,1);
+const int SAMPLE_NUM = 4;
 //temporal vars
 const Sphere sphere1 = Sphere(vec3(0, 0, 0), 1.);
-const Light light1 = Light(vec3(-8, 8, -2), false, vec3(1.), vec3(1.));
+const Light light1 = Light(vec3(-10, 9.5, -0.5), vec3(0, 1, 1), false, LIGHT_AREA, vec3(1.), vec3(1.));
 const Box room = Box(vec3(-10, -10, -20), vec3(10, 10, 20));
 
 //some uti
@@ -60,6 +66,16 @@ mat3 getRotMat(float degree, int choice){
 	else if ( choice == Y )
 		return mat3(cos(rad), 0, sin(rad), 0, 1, 0, -sin(rad), 0, cos(rad));
 	else return mat3(1, 0, 0, 0, 1, 0, 0, 0, 1);
+}
+
+highp float rand(vec2 co)
+{
+    highp float a = 12.9898;
+    highp float b = 78.233;
+    highp float c = 43758.5453;
+    highp float dt= dot(co.xy ,vec2(a,b));
+    highp float sn= mod(dt,3.14);
+    return fract(sin(sn) * c);
 }
 
 bool intersectBox(Ray eyeRay,Box box, out float dist){//ray box intersect
@@ -139,13 +155,15 @@ vec3 lightAt(vec3 hit, vec3 N, vec3 V, int obj)//calculate light at a object poi
 
 	float dist;
     
-    Ray shadowRay = Ray(normalize(light1.posOrDir - hit), hit);
-
-	//shadow
-	if(intersectSphere(sphere1,shadowRay, dist)  && dist > 0.)//intersect any object, blocked
-		return c;
-	c += diffuse(L, N, light1.Id )* kd;
-	c += specular(L, N, V, light1.Is )*  ks;
+    //shadow
+    for(int i =0; i < SAMPLE_NUM; i++){
+    	Ray shadowRay = Ray(normalize(light1.posOrDir +  rand(seed) *light1.size - hit), hit);
+    	seed += vec2(1,1);
+    	if(intersectSphere(sphere1,shadowRay, dist)  && dist > 0.)//intersect any object, blocked
+			continue;
+		c += diffuse(L, N, light1.Id )* kd / float(SAMPLE_NUM);
+		c += specular(L, N, V, light1.Is )*  ks / float(SAMPLE_NUM);		
+    }
 
 	return c;
 }
@@ -182,7 +200,6 @@ vec3 intersect(Ray eyeRay){//main ray bounce function
 	return color;
 }
 
-const int SAMPLE_NUM = 6;
 void main(void) {
 	vec3 cameraDir, color = vec3(0);
 	Ray eyeRay;
