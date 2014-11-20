@@ -3,17 +3,13 @@ window.onload = init;
 
 function init(){
 	var canvas = document.getElementById("canv");
-	canvas.width = 640;
-	canvas.height = 480;
+	canvas.width = 512;
+	canvas.height = 512;
 	canvas.addEventListener("mousemove", Gui.mouseMove, false);
 	canvas.addEventListener("mousedown", Gui.mouseDown, false);
 	canvas.addEventListener("mouseup", Gui.mouseUp, false);
 	canvas.addEventListener("mouseout", Gui.mouseUp, false);
 	document.addEventListener("keydown", Gui.keyDown, false);
-	setInterval(function(){
-		Render.time++;
-
-	}, 1);
 
 	//get gl object
 	try{
@@ -31,7 +27,7 @@ function init(){
     }
 	
 	//set Camera
-	Camera.ratio = canvas.width / canvas.height;
+	Camera.res = [canvas.width,canvas.height];
 	Camera.getRTrans();
 
 
@@ -49,7 +45,12 @@ function init(){
         -1.0, -1.0,
     ]), gl.STATIC_DRAW);
 
-    Render.getTexture();
+    Render.setUniforms();
+    Render.fb = gl.createFramebuffer();
+    Render.tex = [];
+    Render.tex.push(Render.makeTexture());
+    Render.tex.push(Render.makeTexture());
+    Render.texImage = Render.getTexture("im_clip.jpg");
 
     Gui.animate(0);
 }

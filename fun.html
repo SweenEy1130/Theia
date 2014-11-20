@@ -3,23 +3,19 @@
 <!--shades-->
 <script id="shader-vs" type="x-shader/x-vertex">
 attribute vec2 cVertex;//quad vetices
-varying vec3 dir;//eye ray direction
-uniform float fov;//field of view, camera param
-uniform float ratio;//xres/yres
-uniform mat3 rtrans;//translate eye ray from camera space to world space
-
-float fov_factor = tan( radians( fov /2.0) ) ;
-
 void main(void) {
-	
 	gl_Position =  vec4(cVertex, 0, 1.0);
-	dir = rtrans * vec3( cVertex.x * fov_factor * ratio, cVertex.y * fov_factor, 1);//generate eye ray
 }
 </script>
 	
 <script id="shader-fs" type="x-shader/x-fragment">
 precision mediump float;
 //data structures
+struct Camera{
+	vec3 pos,rotv;
+	float fov_factor;//tan( radians( fov /2.0) ) ;
+	vec2 res;
+};
 struct Ray{
 	vec3 dir;
 	vec3 origin;
@@ -43,18 +39,17 @@ struct Light{
 	vec3 Id;//diffuse intensity
 };
 
-uniform vec3 rot, rotv;//motion blur speed
-uniform vec3 cameraPos;//camera position
-uniform float time;
-uniform sampler2D texture_wall;
-varying vec3 dir;//eye ray direction
+uniform Camera camera;
+uniform mat3 trans;
+uniform float sampleCount;
+uniform sampler2D tex0;
+uniform sampler2D tex1;
 //const setting
-const int INT_MAX = 2147483647;
-const int bounce = 3;//max bounce time
-const float epsilon = 0.001;//tolerance
+const int BOUNCE = 3;//max bounce time
+const float EPSILON = 0.001;//tolerance
 const int X = 0, Y = 1, Z = 2;
-const int SAMPLE_GRID = 1;//2 ^ SAMPLE_NUM
-const int SAMPLE_NUM = SAMPLE_GRID * SAMPLE_GRID;
+const int SAMPLE_NUM = 4;
+float msample = sqrt(float(SAMPLE_NUM));
 float s;//seed for random generator
 
 //temporal vars
@@ -95,11 +90,11 @@ bool intersectBox(Ray eyeRay,Box box, out float dist){//ray box intersect
 }
 
 vec3 normalForBox(vec3 hit, Box box){
-	if(hit.x < box.min.x + epsilon ) return vec3(-1.0, 0.0, 0.0);//box left
-	else if(hit.x > box.max.x -  epsilon) return vec3(1.0, 0.0, 0.0);//box right
-	else if(hit.y < box.min.y +  epsilon ) return vec3(0.0, -1.0, 0.0);//box bottom
-	else if(hit.y > box.max.y - epsilon) return vec3(0.0, 1.0, 0.0);//box top
-	else if(hit.z < box.min.z + epsilon ) return vec3(0.0, 0.0, -1.0);//box front
+	if(hit.x < box.min.x + EPSILON ) return vec3(-1.0, 0.0, 0.0);//box left
+	else if(hit.x > box.max.x -  EPSILON) return vec3(1.0, 0.0, 0.0);//box right
+	else if(hit.y < box.min.y +  EPSILON ) return vec3(0.0, -1.0, 0.0);//box bottom
+	else if(hit.y > box.max.y - EPSILON) return vec3(0.0, 1.0, 0.0);//box top
+	else if(hit.z < box.min.z + EPSILON ) return vec3(0.0, 0.0, -1.0);//box front
 	else return vec3(0.0, 0.0, 1.0);//box back
 	return vec3(0.0, 0.0, 1.0);
 }
@@ -148,7 +143,7 @@ vec3 lightAt(vec3 hit, vec3 N, vec3 V, int obj)//calculate light at a object poi
 	if(obj == 0)
 	kd = ka = vec3(0, 0, 0.5);
 	else if(abs(N.x) == 1.0)
-		kd = ka = texture2D(texture_wall, mapfoo(hit)).xyz;
+		kd = ka = texture2D(tex1, mapfoo(hit)).xyz;
 	else if(N.y == 1.0)
 		{ks = ka = vec3(1); kd = vec3(0);}
 	else
@@ -160,7 +155,7 @@ vec3 lightAt(vec3 hit, vec3 N, vec3 V, int obj)//calculate light at a object poi
     
     //shadow
     for(int i = 0; i < SAMPLE_NUM; i++){
-    	vec3 grid = light1.size * vec3(i / SAMPLE_GRID, mod(float(i),float(SAMPLE_GRID)), 0); 
+    	vec3 grid = light1.size * vec3(float(i) / msample, mod(float(i),msample), 0); 
     	Ray shadowRay = Ray(normalize(light1.posOrDir +  rand()*light1.size * 0.25 - hit), hit);
     	if(intersectSphere(sphere1,shadowRay, dist)  && dist > 0.)//intersect any object, blocked
 			continue;
@@ -178,7 +173,7 @@ vec3 intersect(Ray eyeRay){//main ray bounce function
 	bool stop = false;
 	float dist;
 	
-	for(int i = 0; i < bounce; i++){
+	for(int i = 0; i < BOUNCE; i++){
 		if(stop)
 			break;
 		if(intersectSphere(sphere1, eyeRay, dist)){
@@ -192,7 +187,7 @@ vec3 intersect(Ray eyeRay){//main ray bounce function
 				hit = eyeRay.origin + dist * eyeRay.dir;
 				norm = normalForBox(hit, room);
 				ncolor = lightAt(hit, -norm, eyeRay.dir, 1);//calculate inner color
-				stop = hit.y < room.min.y + epsilon ? false : true;//floor reflect
+				stop = hit.y < room.min.y + EPSILON ? false : true;//floor reflect
 			}
 		}
 		color = i==0 ? ncolor : color * 0.5 +  ncolor * 0.5;
@@ -203,19 +198,25 @@ vec3 intersect(Ray eyeRay){//main ray bounce function
 	return color;
 }
 
+vec2 randOffset(float sampleCount){
+    sampleCount = mod(sampleCount,float(SAMPLE_NUM));
+	vec2 offset = vec2(floor(sampleCount/msample),mod(sampleCount,msample));
+	offset += vec2(rand(), rand());
+	offset /= msample;
+	return offset;
+}
 void main(void) {
-	vec3 cameraDir, color = vec3(0);
-	Ray eyeRay;
-	float fi;
-	srand(dir.xy);
-	for(int i = 0; i < SAMPLE_NUM; ++i){
-		fi = rand() / 24.;
-		cameraDir = normalize(getRotMat(rot.x + rotv.x * fi , X) * getRotMat(rot.y + rotv.y * fi, Y)  * dir);
-		eyeRay = Ray(cameraDir, cameraPos);
-		color += intersect(eyeRay) / float(SAMPLE_NUM);		
-	}
-
-	gl_FragColor = vec4(color, 1);
+	vec3 color = vec3(0) , pColor;
+	vec2 offset;
+	//vec2 offset =vec2(0);
+	srand(gl_FragCoord.xy + vec2(sampleCount));//feed random generator
+	offset = randOffset(sampleCount);
+	Ray eyeRay = Ray(trans * vec3((gl_FragCoord.xy+offset-camera.res/2.)/camera.res.yy * camera.fov_factor,1),camera.pos);//fire eye ray
+	eyeRay.dir = normalize(eyeRay.dir);
+	pColor = texture2D(tex0, gl_FragCoord.xy/camera.res).rgb;
+	color = intersect(eyeRay);	
+	gl_FragColor = vec4(mix(pColor,color,1./sampleCount), 1);
+	//gl_FragColor = vec4(color, 1);
 }
 </script>
 <script type = "text/javascript"  src = "fun_uti.js"></script>

@@ -3,6 +3,7 @@ var Gui = {
 	drag : false,
 	offset : [0, 0], //newPos - oldPos
 	time : -1,
+	sampleCount: 0,
 	
 	mouseDown :function (e) {
 		Gui.oldPos = [e.pageX, e.pageY];
@@ -28,6 +29,7 @@ var Gui = {
 			Camera.rotate = math.add(Camera.rotate,[Gui.offset[1] , Gui.offset[0] , 0]);
 			Camera.rotate[0] = math.min(math.max(Camera.rotate[0], -89), 89);//constrain u can not do upsidedown
 			Camera.rotate[1] = Camera.rotate[1] > 180 ? Camera.rotate[1] - 360 : Camera.rotate[1];
+			Gui.sampleCount = 0;
 			
 		}
 
@@ -48,19 +50,35 @@ var Gui = {
 
 	},
 	animate : function(time) {
-		if (Render.texture.webglTexture) {
-			gl.activeTexture(gl.TEXTURE0);
-			gl.bindTexture(gl.TEXTURE_2D,Render.texture.webglTexture);
+
+		if (Render.texImage.tex) {
+			gl.activeTexture(gl.TEXTURE1);
+			gl.uniform1i(Render.tex1Loc, 1);
+			gl.bindTexture(gl.TEXTURE_2D,Render.texImage.tex);
 		}
-
+		Camera.getRTrans();//update translate mat
+		Gui.sampleCount++;
 		Render.updateShaderParams(gl);
+		//bind
+		gl.activeTexture(gl.TEXTURE0);//previous render result
+		gl.bindTexture(gl.TEXTURE_2D,Render.tex[0]);
+		gl.uniform1i(Render.tex0Loc, 0);
+		gl.bindFramebuffer(gl.FRAMEBUFFER, Render.fb);
 
+		gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, Render.tex[1], 0);
 		gl.enableVertexAttribArray(Render.program);
+		//draw
 		gl.vertexAttribPointer(Render.program.cVertex, 2, gl.FLOAT, false, 0, 0);
 		gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+		gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+		gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+		//free and lock
 		gl.disableVertexAttribArray(Render.program);
+		gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+		Render.tex.reverse();//swap 2 element
 		//gl.flush();
 
 		window.requestAnimationFrame(Gui.animate);
+		
   }
 }
