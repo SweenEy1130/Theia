@@ -41,6 +41,7 @@ var Render = {
 		this.sampleCountLoc = gl.getUniformLocation(this.program, "sampleCount");
 		this.tex1Loc = gl.getUniformLocation(this.program, "tex1");
 		this.tex0Loc = gl.getUniformLocation(this.program, "tex0");
+		this.timeLoc = gl.getUniformLocation(this.program, "globTime");
 	},
 	getShaderProgram : function(gl){
 		var fragmentShader = this.getShader(gl, "shader-fs", gl.FRAGMENT_SHADER);
@@ -80,6 +81,8 @@ var Render = {
 
  	  updateShaderParams : function(gl){
  	  	gl.uniform1f(this.sampleCountLoc, Gui.sampleCount);
+ 	  	gl.uniform1f(this.timeLoc, (Date.now()-Gui.timeStart)/1000.);
+ 	  	console.log((Date.now() - Gui.timeStart)/1000.);
  	 	gl.uniform1f(this.camFovLoc, Math.tan(Uti.radians(Camera.fov/2)));
  	 	gl.uniform2fv(this.camResLoc, Camera.res);
  	 	gl.uniform3fv(this.camPosLoc, Camera.pos);

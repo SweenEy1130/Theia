@@ -1,6 +1,5 @@
 var gl = null;
 window.onload = init;
-
 function init(){
 	var canvas = document.getElementById("canv");
 	canvas.width = 512;
@@ -51,6 +50,6 @@ function init(){
     Render.tex.push(Render.makeTexture());
     Render.tex.push(Render.makeTexture());
     Render.texImage = Render.getTexture("im_clip.jpg");
-
+    Gui.timeStart = Date.now();
     Gui.animate(0);
 }

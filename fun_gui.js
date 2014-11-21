@@ -4,6 +4,7 @@ var Gui = {
 	offset : [0, 0], //newPos - oldPos
 	time : -1,
 	sampleCount: 0,
+	timeStart : 0,
 	
 	mouseDown :function (e) {
 		Gui.oldPos = [e.pageX, e.pageY];
@@ -40,10 +41,12 @@ var Gui = {
 			case 38://UP
 			case 87:
 				Camera.pos[2] += Camera.rotate[1] < 90 && Camera.rotate[1] > -90 ? 0.1 : -0.1;
+				Gui.sampleCount = 0;
 				break;
 			case 40://DOWN
 			case 83:
 				Camera.pos[2] += Camera.rotate[1] < 90 && Camera.rotate[1] > -90 > 0 ? -0.1 : 0.1 ;
+				Gui.sampleCount = 0;
 				break;
 		}
 		Render.updateShaderParams(gl);

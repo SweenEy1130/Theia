@@ -23,12 +23,23 @@ struct Ray{
 struct Sphere{
 	vec3 pos;
 	float rad;
+	int mt;
 };
 struct Box{
-	vec3 min;
-	vec3 max;
+	vec3 min,max;
+	int mt;
 };
-
+struct Material{ //BRDF or something
+	//here we use ka,kd,ks for test
+	vec3 ka,kd,ks;
+	float ns;
+};
+struct Hit{
+	vec3 pos;
+	vec3 norm;
+	vec2 uv;//texture coord
+	int mt;//point to 
+};
 const int LIGHT_AREA = 1;
 struct Light{
 	vec3 posOrDir;//positional light use pos while directional light use direction
@@ -44,18 +55,20 @@ uniform mat3 trans;
 uniform float sampleCount;
 uniform sampler2D tex0;
 uniform sampler2D tex1;
+uniform highp float globTime;
 //const setting
 const int BOUNCE = 3;//max bounce time
 const float EPSILON = 0.001;//tolerance
 const int X = 0, Y = 1, Z = 2;
-const int SAMPLE_NUM = 4;
+const int SAMPLE_NUM = 1;
 float msample = sqrt(float(SAMPLE_NUM));
 float s;//seed for random generator
 
-//temporal vars
-const Sphere sphere1 = Sphere(vec3(0, 0, 0), 1.);
-const Light light1 = Light(vec3(-10, 9.5, -0.5), vec3(0, 1, 1), false, LIGHT_AREA, vec3(1.), vec3(1.));
-const Box room = Box(vec3(-10, -10, -20), vec3(10, 10, 20));
+//temporal vars should be uniforms
+const Sphere sphere1 = Sphere(vec3(0, 0, 0), 1.,1);//use material 1
+const Light light1 = Light(vec3(-10, 9, -1), vec3(0, 2, 1), false, LIGHT_AREA, vec3(1.), vec3(1.));
+const Box room = Box(vec3(-10, -10, -20), vec3(10, 10, 20), 0);
+Material material[3];//we use dummyMtl to init these 2 mt
 
 //some uti
 mat3 getRotMat(float degree, int choice){
@@ -74,6 +87,14 @@ void srand(vec2 p){
 float rand(){
 	s=fract(s*32322.65432+0.12333);
 	return abs(fract(s));
+}
+
+vec2 randOffset(float sampleCount){
+    sampleCount = mod(sampleCount,float(SAMPLE_NUM));
+	vec2 offset = vec2(floor(sampleCount/msample),mod(sampleCount,msample));
+	offset += vec2(rand(), rand());
+	offset /= msample;
+	return offset;
 }
 
 bool intersectBox(Ray eyeRay,Box box, out float dist){//ray box intersect
@@ -111,6 +132,21 @@ bool intersectSphere(Sphere sphere, Ray eyeRay, out float dist) {
 	return true;
 }
 
+bool hitSomething(Ray eyeRay, out Hit hit){
+	float mDist = - 1.;
+	//int id;//point to hitted
+	bool ifHit = false;
+	//hit spheres
+	if(intersectSphere(sphere1, eyeRay, mDist))//here should be iteration
+        ifHit = true;
+	if(!ifHit)
+		return false;
+	hit.pos = eyeRay.origin + mDist * eyeRay.dir;
+	hit.norm = normalize(hit.pos - sphere1.pos);
+	hit.mt = sphere1.mt;
+	return true;
+}
+
 vec3 ambient(vec3 color){
 	return color;
 }
@@ -132,91 +168,96 @@ vec2 mapfoo(vec3 pos){
 	return pos.yz;
 }
 
-vec3 lightAt(vec3 hit, vec3 N, vec3 V, int obj)//calculate light at a object point
+vec3 lightAt(Hit hit, vec3 N, vec3 V)//calculate light at a object point
 {
-	//vec3 L = lightSource;
-	vec3 ka = vec3(0.3), ks = vec3(0.4), kd = vec3(0.3);
-	vec3 L = normalize(light1.posOrDir - hit);//use point light
+	vec3 ka, kd, ks;
+	vec3 L = normalize(light1.posOrDir - hit.pos);//use point light
 	vec3 R = reflect(L, N);
 	vec3 c = vec3(0);
-	vec2 uv;
-	if(obj == 0)
-	kd = ka = vec3(0, 0, 0.5);
-	else if(abs(N.x) == 1.0)
-		kd = ka = texture2D(tex1, mapfoo(hit)).xyz;
-	else if(N.y == 1.0)
-		{ks = ka = vec3(1); kd = vec3(0);}
-	else
-		kd = ka = vec3(0.5, 0, 0);
 
+	for(int i = 0; i < 3;i++){
+		if(hit.mt == i){
+			ka = material[i].ka;
+			kd = material[i].kd;
+			ks = material[i].ks;
+			break;
+		}
+	}
 	c += ambient(vec3(0.2)) * ka;
-
-	float dist;
-    
     //shadow
-    for(int i = 0; i < SAMPLE_NUM; i++){
-    	vec3 grid = light1.size * vec3(float(i) / msample, mod(float(i),msample), 0); 
-    	Ray shadowRay = Ray(normalize(light1.posOrDir +  rand()*light1.size * 0.25 - hit), hit);
-    	if(intersectSphere(sphere1,shadowRay, dist)  && dist > 0.)//intersect any object, blocked
-			continue;
-		c += diffuse(L, N, light1.Id )* kd / float(SAMPLE_NUM);
-		c += specular(L, N, V, light1.Is )*  ks / float(SAMPLE_NUM);		
-    }
-
+    vec3 offset = vec3(randOffset(sampleCount), 0);
+    float dist = -1.;
+    Ray shadowRay = Ray(normalize(light1.posOrDir+offset*light1.size-hit.pos), hit.pos);
+    if(intersectSphere(sphere1,shadowRay, dist))//intersect any object, blocked
+    return c;
+    c += diffuse(L, N, light1.Id )* kd ;
+    c += specular(L, N, V, light1.Is )*  ks ;		
 	return c;
 }
 
+int dummySetMtl0(Hit hit){//set material for bounding box
+	if(abs(hit.norm.x) == 1.0){
+		material[0].kd = material[0].ka = texture2D(tex1, mapfoo(hit.pos)).xyz;
+		return 0;
+	}
+	if(abs(hit.norm.y) == 1.0){
+		return 1;
+	}
+	return 2;
+}
+void dummyMtl(){
+	//material[0] use texture to change
+	material[0].ka = vec3(0.2);//ambient
+    material[1] = Material(vec3(0.2),vec3(0.5,0.5,0.0),vec3(0.51,0.51,0.51),32.);
+	material[2] = Material(vec3(0.2),vec3(0.1,0.1,0.9),vec3(0.3),32.);
+}
+
 vec3 intersect(Ray eyeRay){//main ray bounce function
-	vec3 color = vec3(0),ncolor, norm, hit, stoLight;
-	vec3 dl, al, sl;
-	vec2 roomHits;
+	vec3 color = vec3(0),ncolor;
+	Hit hit;
 	bool stop = false;
 	float dist;
 	
 	for(int i = 0; i < BOUNCE; i++){
 		if(stop)
 			break;
-		if(intersectSphere(sphere1, eyeRay, dist)){
-			hit = eyeRay.origin + dist * eyeRay.dir;
-			norm = normalize(hit - sphere1.pos);
-			ncolor = lightAt(hit, norm, eyeRay.dir, 0);
-			stop = false;
+		if(hitSomething(eyeRay, hit)){
+			ncolor = lightAt(hit, hit.norm, eyeRay.dir);
 		}
-		else{//intersect wall somewhere
+		else{//hit bounding box
 			if(intersectBox(eyeRay, room, dist)){
-				hit = eyeRay.origin + dist * eyeRay.dir;
-				norm = normalForBox(hit, room);
-				ncolor = lightAt(hit, -norm, eyeRay.dir, 1);//calculate inner color
-				stop = hit.y < room.min.y + EPSILON ? false : true;//floor reflect
+				hit.pos = eyeRay.origin + dist * eyeRay.dir;
+				hit.norm = normalForBox(hit.pos, room);
+				hit.mt = dummySetMtl0(hit);
+				ncolor = lightAt(hit, -hit.norm, eyeRay.dir);//calculate inner color
 			}
+			stop = true;
 		}
 		color = i==0 ? ncolor : color * 0.5 +  ncolor * 0.5;
-		//generate new ray
-		eyeRay.origin = eyeRay.origin + dist * eyeRay.dir;
-		eyeRay.dir = reflect(eyeRay.dir, norm);
+		//fire new ray
+		eyeRay.origin = hit.pos;
+		eyeRay.dir = reflect(eyeRay.dir, hit.norm);
 	}
 	return color;
 }
 
-vec2 randOffset(float sampleCount){
-    sampleCount = mod(sampleCount,float(SAMPLE_NUM));
-	vec2 offset = vec2(floor(sampleCount/msample),mod(sampleCount,msample));
-	offset += vec2(rand(), rand());
-	offset /= msample;
-	return offset;
-}
+
+
 void main(void) {
 	vec3 color = vec3(0) , pColor;
 	vec2 offset;
-	//vec2 offset =vec2(0);
-	srand(gl_FragCoord.xy + vec2(sampleCount));//feed random generator
+	vec2 seed = gl_FragCoord.xy/camera.res+globTime;
+    //init operation
+	srand(seed);//feed random generator
+    dummyMtl();
+    //fire random ray
 	offset = randOffset(sampleCount);
-	Ray eyeRay = Ray(trans * vec3((gl_FragCoord.xy+offset-camera.res/2.)/camera.res.yy * camera.fov_factor,1),camera.pos);//fire eye ray
+	Ray eyeRay = Ray(trans*vec3((gl_FragCoord.xy+offset-camera.res/2.)/camera.res.yy * camera.fov_factor,1),camera.pos);//fire eye ray
 	eyeRay.dir = normalize(eyeRay.dir);
 	pColor = texture2D(tex0, gl_FragCoord.xy/camera.res).rgb;
 	color = intersect(eyeRay);	
 	gl_FragColor = vec4(mix(pColor,color,1./sampleCount), 1);
-	//gl_FragColor = vec4(color, 1);
+	//gl_FragColor = vec4(vec3(offset.x), 1);
 }
 </script>
 <script type = "text/javascript"  src = "fun_uti.js"></script>
