@@ -82,7 +82,6 @@ var Render = {
  	  updateShaderParams : function(gl){
  	  	gl.uniform1f(this.sampleCountLoc, Gui.sampleCount);
  	  	gl.uniform1f(this.timeLoc, (Date.now()-Gui.timeStart)/1000.);
- 	  	console.log((Date.now() - Gui.timeStart)/1000.);
  	 	gl.uniform1f(this.camFovLoc, Math.tan(Uti.radians(Camera.fov/2)));
  	 	gl.uniform2fv(this.camResLoc, Camera.res);
  	 	gl.uniform3fv(this.camPosLoc, Camera.pos);
