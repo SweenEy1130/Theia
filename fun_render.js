@@ -30,26 +30,24 @@ var Camera = {
 	},
 };
 var Render = {
-	program : null,
+	programs : [],
 	texture : null,
 
-	setUniforms: function(){
-		this.camFovLoc = gl.getUniformLocation(this.program, "camera.fov_factor");
-		this.camResLoc = gl.getUniformLocation(this.program, "camera.res");
-		this.camPosLoc = gl.getUniformLocation(this.program, "camera.pos");
-		this.camTransLoc = gl.getUniformLocation(this.program, "trans");
-		this.sampleCountLoc = gl.getUniformLocation(this.program, "sampleCount");
-		this.tex1Loc = gl.getUniformLocation(this.program, "tex1");
-		this.tex0Loc = gl.getUniformLocation(this.program, "tex0");
-		this.timeLoc = gl.getUniformLocation(this.program, "globTime");
+	setUniforms: function(program){
+		program.camFovLoc = gl.getUniformLocation(program, "camera.fov_factor");
+		program.camResLoc = gl.getUniformLocation(program, "camera.res");
+		program.camPosLoc = gl.getUniformLocation(program, "camera.pos");
+		program.camTransLoc = gl.getUniformLocation(this.program, "trans");
+		program.sampleCountLoc = gl.getUniformLocation(program, "sampleCount");
+		program.tex1Loc = gl.getUniformLocation(program, "tex1");
+		program.tex0Loc = gl.getUniformLocation(program, "tex0");
+		program.timeLoc = gl.getUniformLocation(program, "globTime");
 	},
-	getShaderProgram : function(gl){
-		var fragmentShader = this.getShader(gl, "shader-fs", gl.FRAGMENT_SHADER);
-		var vertexShader = this.getShader(gl, "shader-vs", gl.VERTEX_SHADER);
+	getShaderProgram : function(vs_url, fs_url){
+		var vertexShader = this.getShader(vs_url, gl.VERTEX_SHADER);
+		var fragmentShader = this.getShader(fs_url, gl.FRAGMENT_SHADER);
 		
-		this.program = gl.createProgram();
-		program = this.program;//convenient to write
-		
+		var program = gl.createProgram();
 		gl.attachShader(program, vertexShader);
 		gl.attachShader(program, fragmentShader);
 		gl.linkProgram(program);
@@ -59,33 +57,39 @@ var Render = {
 		}
 		return program;
 	},
+ 	 getShader : function(url, type){
+ 	 	var ss;//shaderScript and shader
+ 	 	$.ajax({
+ 	 		dataType: "text",
+ 	 		url: url,
+ 	 		async: false,//synchronically load file
+ 	 		success: function(data){
+ 	 			ss = data;
+ 	 		},
+ 	 		error:function(){
+ 	 			console.log("unable to load glsl");
+ 	 		}
+ 	 	});
 
-	getShader : function(gl, id, type) {
-		var shaderScript, shader;
-		shaderScript = document.getElementById(id);
-
-		if (!shaderScript || (shaderScript.type != "x-shader/x-fragment" && shaderScript.type != "x-shader/x-vertex") ){
-			return null;
-		}
-		shader = gl.createShader(type);
-		gl.shaderSource(shader, shaderScript.text);
-		gl.compileShader(shader);  
-
- 	 	// See if it compiled successfully
- 	 	if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {  
- 	 		alert("An error occurred compiling the shaders: " + gl.getShaderInfoLog(shader));  
+ 	 	var s = gl.createShader(type);
+ 	 	gl.shaderSource(s, ss);
+ 	 	gl.compileShader(s);
+  	 	// See if it compiled successfully
+ 	 	if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {  
+ 	 		alert("Compile Error in " + url+ ":" + gl.getShaderInfoLog(s));  
  	 		return null;  
  	 	}
- 	 	return shader;
+ 	 	return s;		
+ 	 	    
  	 },
 
- 	  updateShaderParams : function(gl){
- 	  	gl.uniform1f(this.sampleCountLoc, Gui.sampleCount);
- 	  	gl.uniform1f(this.timeLoc, (Date.now()-Gui.timeStart)/1000.);
- 	 	gl.uniform1f(this.camFovLoc, Math.tan(Uti.radians(Camera.fov/2)));
- 	 	gl.uniform2fv(this.camResLoc, Camera.res);
- 	 	gl.uniform3fv(this.camPosLoc, Camera.pos);
- 	 	gl.uniformMatrix3fv(this.camTransLoc, false, Uti.flat(Camera.rtrans));
+ 	  updateShaderParams : function(program){
+ 	  	gl.uniform1f(program.sampleCountLoc, Gui.sampleCount);
+ 	  	gl.uniform1f(program.timeLoc, (Date.now()-Gui.timeStart)/1000.);
+ 	 	gl.uniform1f(program.camFovLoc, Math.tan(Uti.radians(Camera.fov/2)));
+ 	 	gl.uniform2fv(program.camResLoc, Camera.res);
+ 	 	gl.uniform3fv(program.camPosLoc, Camera.pos);
+ 	 	gl.uniformMatrix3fv(program.camTransLoc, false, Uti.flat(Camera.rtrans));
  	 	//gl.uniform3fv(gl.getUniformLocation(this.program, "camera.rotv"), Camera.rotv);
  	 },
 

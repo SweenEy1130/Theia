@@ -49,38 +49,40 @@ var Gui = {
 				Gui.sampleCount = 0;
 				break;
 		}
-		Render.updateShaderParams(gl);
 
 	},
 	animate : function(time) {
 
 		if (Render.texImage.tex) {
-			gl.activeTexture(gl.TEXTURE1);
-			gl.uniform1i(Render.tex1Loc, 1);
+			gl.useProgram(Render.program);//draw to frame buffer
+			gl.activeTexture(gl.TEXTURE1);//enviroment texture
+			gl.uniform1i(Render.program.tex1Loc, 1);
 			gl.bindTexture(gl.TEXTURE_2D,Render.texImage.tex);
 		}
 		Camera.getRTrans();//update translate mat
 		Gui.sampleCount++;
-		Render.updateShaderParams(gl);
-		//bind
+		//draw to frame buffer
+		gl.useProgram(Render.program);
+		Render.updateShaderParams(Render.program);
 		gl.activeTexture(gl.TEXTURE0);//previous render result
 		gl.bindTexture(gl.TEXTURE_2D,Render.tex[0]);
-		gl.uniform1i(Render.tex0Loc, 0);
+		gl.uniform1i(Render.program.tex0Loc, 0);
 		gl.bindFramebuffer(gl.FRAMEBUFFER, Render.fb);
-
 		gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, Render.tex[1], 0);
-		gl.enableVertexAttribArray(Render.program);
-		//draw
+		gl.enableVertexAttribArray(Render.program);		
 		gl.vertexAttribPointer(Render.program.cVertex, 2, gl.FLOAT, false, 0, 0);
 		gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+		gl.disableVertexAttribArray(Render.program);
+		//draw to screen
+		gl.useProgram(Render.drawProg);
+		gl.enableVertexAttribArray(Render.drawProg);
+		gl.vertexAttribPointer(Render.drawProg.cVertex, 2, gl.FLOAT, false, 0, 0);	
 		gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 		gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-		//free and lock
 		gl.disableVertexAttribArray(Render.program);
-		gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+		//flip texture
 		Render.tex.reverse();//swap 2 element
 		//gl.flush();
-
 		window.requestAnimationFrame(Gui.animate);
 		
   }

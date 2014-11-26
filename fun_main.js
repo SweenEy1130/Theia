@@ -28,11 +28,12 @@ function init(){
 	//set Camera
 	Camera.res = [canvas.width,canvas.height];
 	Camera.getRTrans();
-
-
-	var program = Render.getShaderProgram(gl);
-	gl.useProgram(program);
-	Render.updateShaderParams(gl);
+	var traceProg = Render.getShaderProgram("shaders/trace_vs.glsl","shaders/trace_fs.glsl");
+	gl.useProgram(traceProg);
+	Render.program = traceProg;
+	Render.setUniforms(traceProg);
+	var drawProg = Render.getShaderProgram("shaders/draw_vs.glsl","shaders/draw_fs.glsl");
+	Render.drawProg = drawProg;
 
 	//init buffer, 2 tris for whole canvas
 	var quadBuffer = gl.createBuffer();
@@ -44,10 +45,9 @@ function init(){
         -1.0, -1.0,
     ]), gl.STATIC_DRAW);
 
-    Render.setUniforms();
     Render.fb = gl.createFramebuffer();
     Render.tex = [];
-    Render.tex.push(Render.makeTexture());
+    Render.tex.push(Render.makeTexture());//render to texture
     Render.tex.push(Render.makeTexture());
     Render.texImage = Render.getTexture("im_clip.jpg");
     Gui.timeStart = Date.now();
