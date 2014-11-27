@@ -178,7 +178,9 @@
 	}
 
 	varying vec2 vUv;
+	varying vec3 worldPosition;
 	varying float noise;
+
 	uniform float time;
 
 	float turbulence( vec3 p ) {
@@ -198,30 +200,50 @@
 	  float b = 5.0 * pnoise( 0.05 * position + vec3( 2.0 * time ), vec3( 100.0 ) );
 	  float displacement = - noise + b;
 
-	  vec3 newPosition = position + normal * displacement;
-	  gl_Position = projectionMatrix * modelViewMatrix * vec4( newPosition, 1.0 );
+	  worldPosition = position + normal * displacement;
+	  gl_Position = projectionMatrix * modelViewMatrix * vec4(worldPosition, 1.0 );
 
 	}
 	</script>
 
 	<script type="x-shader/x-vertex" id="fragmentShader">
 	varying vec2 vUv;
+	varying vec3 worldPosition;
 	varying float noise;
-	uniform sampler2D tExplosion;
 
-	float random( vec3 scale, float seed ){
-		return fract( sin( dot( gl_FragCoord.xyz + seed, scale ) ) * 43758.5453 + seed ) ;
+	uniform sampler2D tExplosion;
+	uniform sampler2D normalSampler;
+	uniform sampler2D normalSampler1;
+	uniform float time;
+
+	const vec3 lightPos = vec3(.0,1.0,20.0);
+	const vec3 ambientColor = vec3(0.0, 0.3, 0.6);
+	const vec3 diffuseColor = vec3(0.0, 0.6, 0.3);
+	const vec3 specColor = vec3(1.0, 1.0, 1.0);
+
+	vec4 getNorm(vec2 uv){
+		vec2 uv0 = vec2(mod(uv.x + 0.7 * time, 1.0), mod(uv.y + 0.3 * time, 1.0));
+		vec2 uv1 = vec2(mod(uv.x + 0.5 * time, 1.0), mod(uv.y - 0.6 * time, 1.0));
+		vec4 norm = (texture2D(normalSampler, uv0)+ texture2D(normalSampler1, uv1));
+
+		return norm / 2.0;
 	}
 
 	void main() {
-		// get a random offset
-		// lookup vertically in the texture, using noise and offset
-		// to get the right RGB colour
-		vec2 tPos = vec2(vUv.x, vUv.y);
-		vec4 color = texture2D( tExplosion, tPos );
+		vec4 norm = getNorm(vUv.xy);
+		vec3 normal = normalize(norm.xyz);
+		vec3 lightDir = normalize(lightPos - worldPosition);
+		vec3 reflectDir = reflect(-lightDir, normal);
+		vec3 viewDir = normalize(-worldPosition);
 
-		gl_FragColor = vec4( color.rgb, 1.0 );
+		float lambertian = max(dot(lightDir,normal), 0.0);
+		float specular = 0.0;
 
+		if(lambertian > 0.0) {
+		   float specAngle = max(dot(reflectDir, viewDir), 0.0);
+		   specular = pow(specAngle, 4.0);
+		}
+		gl_FragColor = vec4(ambientColor + lambertian*diffuseColor + 5.0 * specular*specColor, 1.0);
 	}
 	</script>
 
@@ -261,9 +283,13 @@
 			material = new THREE.ShaderMaterial( {
 
 				uniforms: {
-					tExplosion: {
+					normalSampler: {
 						type: "t",
-						value: THREE.ImageUtils.loadTexture( 'water.jpg' )
+						value: THREE.ImageUtils.loadTexture('4483-normal.jpg' )
+					},
+					normalSampler1: {
+						type: "t",
+						value: THREE.ImageUtils.loadTexture('640-normal.jpg' )
 					},
 					time: { // float initialized to 0
 						type: "f",

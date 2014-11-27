@@ -36,8 +36,8 @@
 	const vec3 specColor = vec3(1.0, 1.0, 1.0);
 
 	vec4 getNorm(vec2 uv){
-		vec2 uv0 = vec2(mod(uv.x + time, 1.0), uv.y);
-		vec2 uv1 = vec2(uv.x, mod(uv.y + time, 1.0));
+		vec2 uv0 = vec2(mod(uv.x + 0.7 * time, 1.0), mod(uv.y + 0.3 * time, 1.0));
+		vec2 uv1 = vec2(mod(uv.x + 0.5 * time, 1.0), mod(uv.y - 0.6 * time, 1.0));
 		vec4 norm = (texture2D(normalSampler, uv0)+ texture2D(normalSampler1, uv1));
 
 		return norm / 2.0;
@@ -47,11 +47,11 @@
 		vec4 norm = getNorm(vUv.xy);
 
 		vec3 normal = normalize(norm.xyz);
-    	vec3 lightDir = normalize(lightPos - worldPosition);
-    	vec3 reflectDir = reflect(-lightDir, normal);
-    	vec3 viewDir = normalize(-worldPosition);
+		vec3 lightDir = normalize(lightPos - worldPosition);
+		vec3 reflectDir = reflect(-lightDir, normal);
+		vec3 viewDir = normalize(-worldPosition);
 
-    	float lambertian = max(dot(lightDir,normal), 0.0);
+		float lambertian = max(dot(lightDir,normal), 0.0);
 		float specular = 0.0;
 
 		if(lambertian > 0.0) {
@@ -98,7 +98,7 @@
 				uniforms: {
 					normalSampler: {
 						type: "t",
-						value: THREE.ImageUtils.loadTexture('2563-normal.jpg' )
+						value: THREE.ImageUtils.loadTexture('4483-normal.jpg' )
 					},
 					normalSampler1: {
 						type: "t",
