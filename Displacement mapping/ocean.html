@@ -58,7 +58,7 @@
 		   float specAngle = max(dot(reflectDir, viewDir), 0.0);
 		   specular = pow(specAngle, 4.0);
 		}
-		gl_FragColor = vec4(ambientColor + lambertian*diffuseColor + 5.0 * specular*specColor, 1.0);
+		gl_FragColor = vec4(ambientColor + lambertian*diffuseColor + 5.0 * specular*specColor, 0.9);
 	}
 	</script>
 
@@ -90,6 +90,8 @@
 			camera.target = new THREE.Vector3( 0, 0, 0 );
 			scene.add( camera );
 
+			var hex  = 0xff0000;
+
 			var geometry = new THREE.PlaneBufferGeometry( 50, 50, 1, 1);
 			geometry.applyMatrix( new THREE.Matrix4().makeRotationZ(-Math.PI / 4 ) );
 			geometry.applyMatrix( new THREE.Matrix4().makeRotationX(-Math.PI / 2.5 ) );
@@ -111,17 +113,28 @@
 				},
 				vertexShader: document.getElementById( 'vertexShader' ).textContent,
 				fragmentShader: document.getElementById( 'fragmentShader' ).textContent,
+				depthWrite: false,
+				transparent: true,
+				side:THREE.DoubleSide,
+				combine: THREE.MixOperation,
 			} );
 
 			mesh = new THREE.Mesh(geometry, material);
 			scene.add( mesh );
 
-			// Create light
-			var light = new THREE.PointLight(0xff00ff, 1.0);
-			// We want it to be very close to our character
-			light.position.set(0.0,0.0,0.5);
-			camera.add(light);
-			scene.add(camera);
+			var bkgeo = new THREE.PlaneBufferGeometry( 50, 50, 64, 64);
+			bkgeo.applyMatrix( new THREE.Matrix4().makeRotationZ(-Math.PI / 4 ) );
+			bkgeo.applyMatrix( new THREE.Matrix4().makeRotationX(-Math.PI / 2.5 ) );
+			bkgeo.applyMatrix( new THREE.Matrix4().makeTranslation(-3, -5, -5) );
+
+			// Load an image as texture
+			glassTexture = new THREE.ImageUtils.loadTexture("../im_clip.jpg");
+			var bkmaterial = new THREE.MeshBasicMaterial( {
+				map: glassTexture,
+			} );
+
+			var bkmesh = new THREE.Mesh(bkgeo, bkmaterial);
+			scene.add(bkmesh);
 
 			// create the renderer and attach it to the DOM
 			renderer = new THREE.WebGLRenderer();

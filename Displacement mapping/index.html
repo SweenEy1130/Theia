@@ -10,6 +10,7 @@
 	</body>
 
 	<script src="three.min.js"></script>
+	<script src="TerrainLoader.js"></script>
 
 	<script type="x-shader/x-vertex" id="vertexShader">
 	// Perlin noise code
@@ -195,12 +196,13 @@
 
 	void main() {
 	  vUv = uv;
-
-	  noise = 10.0 *  -.10 * turbulence( .5 * normal + time );
+	  vec3 norm = vec3(.5, .5, 0);
+	  // vec3 norm = normal;
+	  noise = 10.0 *  -.10 * turbulence( .5 * norm + time );
 	  float b = 5.0 * pnoise( 0.05 * position + vec3( 2.0 * time ), vec3( 100.0 ) );
 	  float displacement = - noise + b;
 
-	  worldPosition = position + normal * displacement;
+	  worldPosition = position + norm * displacement;
 	  gl_Position = projectionMatrix * modelViewMatrix * vec4(worldPosition, 1.0 );
 
 	}
@@ -243,7 +245,7 @@
 		   float specAngle = max(dot(reflectDir, viewDir), 0.0);
 		   specular = pow(specAngle, 4.0);
 		}
-		gl_FragColor = vec4(ambientColor + lambertian*diffuseColor + 5.0 * specular*specColor, 1.0);
+		gl_FragColor = vec4(ambientColor + lambertian*diffuseColor + 5.0 * specular*specColor, 0.7);
 	}
 	</script>
 
@@ -255,7 +257,7 @@
 			mesh,
 			start = Date.now(),
 			fov = 30;
-		var worldWidth = 64, worldDepth = 64;
+		var worldWidth = 200, worldDepth = 200;
 
 		window.addEventListener( 'load', function() {
 
@@ -298,23 +300,34 @@
 				},
 				vertexShader: document.getElementById( 'vertexShader' ).textContent,
 				fragmentShader: document.getElementById( 'fragmentShader' ).textContent,
-				light: true
+				depthWrite: false,
+				transparent: true,
+				side:THREE.DoubleSide,
+				combine: THREE.MixOperation
 			} );
 
 			// create a sphere and assign the material
-			/*mesh = new THREE.Mesh(
-				new THREE.IcosahedronGeometry( 20, 3 ),
-				material
-			);*/
 			mesh = new THREE.Mesh(geometry, material);
 			scene.add( mesh );
 
-			// Create light
-			var light = new THREE.PointLight(0xff00ff, 1.0);
-			// We want it to be very close to our character
-			light.position.set(0.0,0.0,0.5);
-			camera.add(light);
-			scene.add(camera);
+			var terrainLoader = new THREE.TerrainLoader();
+				terrainLoader.load('terrain/jotunheimen.bin', function(data) {
+					var bkgeo = new THREE.PlaneGeometry(100, 100, worldWidth - 1, worldDepth - 1 );
+					bkgeo.applyMatrix( new THREE.Matrix4().makeTranslation(0, 0, -20 ) );
+					bkgeo.applyMatrix( new THREE.Matrix4().makeRotationZ(-Math.PI / 4 ) );
+					bkgeo.applyMatrix( new THREE.Matrix4().makeRotationX(-Math.PI / 2.5 ) );
+					for (var i = 0, l = bkgeo.vertices.length; i < l; i++) {
+						bkgeo.vertices[i].z = data[i] / 65535 * 25;
+					}
+					// Load an image as texture
+					var bkmaterial = new THREE.MeshPhongMaterial({
+						 map: THREE.ImageUtils.loadTexture('terrain/jotunheimen-texture.jpg')
+					});
+
+					var bkmesh = new THREE.Mesh(bkgeo, bkmaterial);
+					scene.add(bkmesh);
+					scene.add(new THREE.AmbientLight(0xeeeeee));
+			});
 
 			// create the renderer and attach it to the DOM
 			renderer = new THREE.WebGLRenderer();
@@ -328,7 +341,7 @@
 
 		function render() {
 			material.uniforms[ 'time' ].value = .00025 * ( Date.now() - start );
-			// let there be light
+
 			renderer.render( scene, camera );
 			requestAnimationFrame( render );
 		}
