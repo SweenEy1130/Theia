@@ -12,10 +12,10 @@ var Camera = {
 	{
 		var f = Uti.normalize(this.lookat);
 		var u = this.up;
-		
+
 		var r = Uti.crossProduct(u, f);
 		u = Uti.crossProduct(f, r);
-		
+
 		u = Uti.normalize(u);
 		r = Uti.normalize(r);
 
@@ -43,13 +43,18 @@ var Render = {
 		program.mtlTexLoc = gl.getUniformLocation(program, "mtlTex");//material as texture
 		program.wallTexLoc = gl.getUniformLocation(program, "wallTex");//wall texture
 		program.wallNormLoc = gl.getUniformLocation(program, "wallNorm");//wall norm map
+
+		// Water normal map 0 and 1
+		program.waterNorm0Loc = gl.getUniformLocation(program, "waterNorm0");
+		program.waterNorm1Loc = gl.getUniformLocation(program, "waterNorm1");
+
 		program.timeLoc = gl.getUniformLocation(program, "globTime");
 		program.mtlNumLoc = gl.getUniformLocation(program, "mtlNum");
 	},
 	getShaderProgram : function(vs_url, fs_url){//getShader program using vertex shader file and fragment shader file
 		var vertexShader = this.getShader(vs_url, gl.VERTEX_SHADER);
 		var fragmentShader = this.getShader(fs_url, gl.FRAGMENT_SHADER);
-		
+
 		var program = gl.createProgram();
 		gl.attachShader(program, vertexShader);
 		gl.attachShader(program, fragmentShader);
@@ -78,12 +83,12 @@ var Render = {
  	 	gl.shaderSource(s, ss);
  	 	gl.compileShader(s);
   	 	// See if it compiled successfully
- 	 	if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {  
- 	 		alert("Compile Error in " + url+ ":" + gl.getShaderInfoLog(s));  
- 	 		return null;  
+ 	 	if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+ 	 		alert("Compile Error in " + url+ ":" + gl.getShaderInfoLog(s));
+ 	 		return null;
  	 	}
- 	 	return s;		
- 	 	    
+ 	 	return s;
+
  	 },
  	  updateShaderParams : function(program){
  	  	gl.uniform1f(program.sampleCountLoc, Gui.sampleCount);//number of samples achieved for antialiasing

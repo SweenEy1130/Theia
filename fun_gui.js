@@ -5,13 +5,13 @@ var Gui = {
 	time : -1,
 	sampleCount: 0,//when there is no motion, samplecount increase with frames rendered to achieve antialiasing.
 	timeStart : 0,
-	
+
 	mouseDown :function (e) {
 		Gui.oldPos = [e.pageX, e.pageY];
 		Gui.drag = true;
 		time = Date.now();
 	},
-	
+
 	mouseUp: function(e){
 		Gui.drag = false;
 		Gui.oldPos = [-1, -1];
@@ -31,7 +31,7 @@ var Gui = {
 			Camera.rotate[0] = math.min(math.max(Camera.rotate[0], -89), 89);//constrain u can not do upsidedown
 			Camera.rotate[1] = Camera.rotate[1] > 180 ? Camera.rotate[1] - 360 : Camera.rotate[1];
 			Gui.sampleCount = 0;
-			
+
 		}
 
 	},
@@ -60,11 +60,25 @@ var Gui = {
 			gl.uniform1i(Render.program.wallTexLoc, 2);
 			gl.bindTexture(gl.TEXTURE_2D,Render.texImage[0].tex);
 		}
+
 		if (Render.texImage[1].tex) {
 			gl.activeTexture(gl.TEXTURE3);//wall norm availabe
 			gl.uniform1i(Render.program.wallNormLoc, 3);
 			gl.bindTexture(gl.TEXTURE_2D,Render.texImage[1].tex);
-		}		
+		}
+
+		// Water normal map texture load
+		if (Render.waterNorm[0].tex) {
+			gl.activeTexture(gl.TEXTURE4);
+			gl.uniform1i(Render.program.waterNorm0Loc, 4);
+			gl.bindTexture(gl.TEXTURE_2D,Render.waterNorm[0].tex);
+		}
+		if (Render.waterNorm[1].tex) {
+			gl.activeTexture(gl.TEXTURE5);
+			gl.uniform1i(Render.program.waterNorm1Loc, 5);
+			gl.bindTexture(gl.TEXTURE_2D,Render.waterNorm[1].tex);
+		}
+
 		Camera.getRTrans();//update translate matrix
 		Gui.sampleCount++;//when there is no motion, samplecount increase with frames rendered to achieve antialiasing.
 		Render.updateShaderParams(Render.program);
@@ -79,7 +93,7 @@ var Gui = {
 		//render to texture
 		gl.bindFramebuffer(gl.FRAMEBUFFER, Render.fb);
 		gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, Render.tex[1], 0);
-		gl.enableVertexAttribArray(Render.program);		
+		gl.enableVertexAttribArray(Render.program);
 		gl.vertexAttribPointer(Render.program.cVertex, 2, gl.FLOAT, false, 0, 0);
 		gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 		gl.disableVertexAttribArray(Render.program);
@@ -92,16 +106,16 @@ var Gui = {
 		gl.useProgram(Render.drawProg);
 		gl.bindTexture(gl.TEXTURE_2D, Render.tex[1]);
 		gl.enableVertexAttribArray(Render.drawProg);
-		gl.vertexAttribPointer(Render.drawProg.cVertex, 2, gl.FLOAT, false, 0, 0);	
+		gl.vertexAttribPointer(Render.drawProg.cVertex, 2, gl.FLOAT, false, 0, 0);
 		gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 		gl.disableVertexAttribArray(Render.program);
-		gl.bindTexture(gl.TEXTURE_2D, null);	
+		gl.bindTexture(gl.TEXTURE_2D, null);
 	},
 	animate : function(time) {
 		Gui.renderToBuffer();
 		Gui.drawToScreen();
 		gl.flush();
 		window.requestAnimationFrame(Gui.animate);
-		
+
   }
 }

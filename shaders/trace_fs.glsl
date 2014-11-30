@@ -18,6 +18,15 @@ struct Box{
 	vec3 min,max;
 	int mt;
 };
+
+// Water plane equation:
+// H(P) = Ax+By+Cz+D = n·P + D = 0
+struct WaterPlane{
+	vec3 norm;
+	float D;
+	int mt;
+};
+
 /*struct Material{ //BRDF or something
 	//here we use ka,kd,ks for test
 	vec3 ka,kd,ks;
@@ -27,7 +36,7 @@ struct Hit{
 	vec3 pos;
 	vec3 norm;
 	vec2 uv;//texture coord
-	int mt;//point to 
+	int mt;//point to
 };
 const int LIGHT_AREA = 1;
 struct Light{
@@ -45,8 +54,12 @@ uniform float sampleCount;
 uniform float mtlNum;
 uniform sampler2D pTex;//previous render result
 uniform sampler2D mtlTex;
+// Wall texture and normal map
 uniform sampler2D wallTex;
 uniform sampler2D wallNorm;
+// Water normal map texture
+uniform sampler2D waterNorm0;
+uniform sampler2D waterNorm1;
 
 uniform highp float globTime;
 //const setting
@@ -60,6 +73,7 @@ float msample = sqrt(float(SAMPLE_NUM));
 float s;//seed for random generator
 
 //temporal vars should be uniforms
+const WaterPlane water = WaterPlane(vec3(0,0,-1), 20.0, 2);
 const Light light1 = Light(vec3(-10, 9, -1), vec3(0, 2, 1), false, LIGHT_AREA, vec3(1.), vec3(1.));
 const Box room = Box(vec3(-10, -10, -20), vec3(10, 10, 20), 1);
 const int SPHERE_NUM = 5;
@@ -115,6 +129,40 @@ vec3 normalForBox(vec3 hit, Box box){
 	return vec3(0.0, 0.0, 1.0);
 }
 
+bool intersectWaterPlane(WaterPlane plane, Ray eyeRay, out float dist){
+	// ray water intersect
+	// P(t) = Ro + t * Rd
+	// H(P) = n·P + D = 0
+	// n·(Ro + t * Rd) + D = 0
+	// t = -(D + n·Ro) / n·Rd
+	if (dot(plane.norm, eyeRay.dir) == .0)
+		return false;
+	vec3 n = normalize(plane.norm);
+	float tmp = -(plane.D + dot(n, eyeRay.origin)) / dot(n, eyeRay.dir);
+
+	// Check if it is in square
+	float z = water.D / water.norm.z;
+	vec3 t1 = vec3(-10, -10.0, z) - eyeRay.origin;
+	vec3 t2 = vec3(10, -10.0, z) - eyeRay.origin;
+	vec3 t3 = vec3(10, 10.0, z) - eyeRay.origin;
+	vec3 t4 = vec3(-10, 10.0, z) - eyeRay.origin;
+
+	n = cross(t2, t1);
+	if (dot(eyeRay.dir, n) < .0) return false;
+
+	n = cross(t1, t4);
+	if (dot(eyeRay.dir, n) < .0) return false;
+
+	n = cross(t4, t3);
+	if (dot(eyeRay.dir, n) < .0) return false;
+
+	n = cross(t3, t2);
+	if (dot(eyeRay.dir, n) < .0) return false;
+
+	dist = tmp;
+	return true;
+}
+
 bool intersectSphere(Sphere sphere, Ray eyeRay, out float dist) {
 	vec3 c = sphere.pos - eyeRay.origin;
 	float b = dot(eyeRay.dir, c);
@@ -125,6 +173,21 @@ bool intersectSphere(Sphere sphere, Ray eyeRay, out float dist) {
 	return false;
 	dist = b- sqrt(sphere.rad * sphere.rad- d);
 	return true;
+}
+
+// Map the hit position to texture coord
+vec2 texCordWater(vec3 pos){
+	vec2 uv;
+	uv = vec2((pos.x + 10.) / 10., (pos.y + 10.) / 10.0);
+	return uv;
+}
+
+// Get the water norm from the two normal texture
+vec3 getWaterNorm(vec3 pos){
+	vec2 uv = texCordWater(pos);
+	vec2 uv0 = vec2(mod(uv.x + 0.7 * globTime, 1.0), mod(uv.y + 0.3 * globTime, 1.0));
+	vec2 uv1 = vec2(mod(uv.x + 0.5 * globTime, 1.0), mod(uv.y - 0.6 * globTime, 1.0));
+	return (texture2D(waterNorm0, uv0) + texture2D(waterNorm1, uv1)).xyz;
 }
 
 bool hitSomething(Ray eyeRay, out Hit hit, bool once){
@@ -141,6 +204,7 @@ bool hitSomething(Ray eyeRay, out Hit hit, bool once){
 			hit.mt = sphere[i].mt;
 		}
 	}
+
 	if(mDist == INFINITY)//hit nothing
 		return false;
 	hit.pos = eyeRay.origin + mDist * eyeRay.dir;
@@ -180,7 +244,7 @@ vec3 lightAt(Hit hit, vec3 N, vec3 V)//calculate light at a object point
 	vec3 c = vec3(0);
 	attr = texture2D(mtlTex, vec2(ATTR, mtlCoord)).xyz;//x->illum y->ns z->texture
 	illum = int(attr.x);
-	
+
 	//map
 	map = texture2D(mtlTex, vec2(MAP, mtlCoord)).xyz;
 
@@ -210,7 +274,7 @@ vec3 lightAt(Hit hit, vec3 N, vec3 V)//calculate light at a object point
     if(hitSomething(shadowRay, sHit, true))
        return c;
     c += diffuse(L, N, light1.Id )* kd;
-    c += specular(L, N, V, light1.Is, ns)*  ks ;		
+    c += specular(L, N, V, light1.Is, ns)*  ks ;
 	return c;
 }
 
@@ -236,8 +300,8 @@ vec3 intersect(Ray eyeRay){//main ray bounce function
 	Hit hit;
 	bool stop = false;
 	float dist;
-	
-	for(int i = 0; i < BOUNCE; i++){	
+
+	for(int i = 0; i < BOUNCE; i++){
 		if(hitSomething(eyeRay, hit, false)){//hit anything inside box
 			ncolor = lightAt(hit, hit.norm, eyeRay.dir);//calculate color
 		}
@@ -248,14 +312,24 @@ vec3 intersect(Ray eyeRay){//main ray bounce function
 				hit.mt = dummySetMtl0(hit);//different merterial for different face
 				ncolor = lightAt(hit, -hit.norm, eyeRay.dir);//calculate inner color
 			}
+
+			float mDist;
+			// Hit water plane
+			if (intersectWaterPlane(water, eyeRay, mDist) && dist > mDist){
+				hit.pos = eyeRay.origin + mDist * eyeRay.dir;
+				hit.norm = getWaterNorm(hit.pos);
+				hit.mt = water.mt;
+				// ncolor = getWaterNorm(hit.pos).xyz;
+				ncolor = hit.pos;
+			}
+
 			stop = true;
 		}
 		color = i==0 ? ncolor : color * 0.5 +  ncolor * 0.5;
 		//fire new ray
 		eyeRay.origin = hit.pos;
 		eyeRay.dir = reflect(eyeRay.dir, hit.norm);
-		if(stop)
-			break;
+		if(stop) break;
 	}
 	return color;
 }
@@ -273,7 +347,7 @@ void main(void) {
 	offset = randOffset(sampleCount);//random offset to do Antialiasing
 	Ray eyeRay = Ray(trans*vec3((gl_FragCoord.xy+offset-camera.res/2.)/camera.res.yy * camera.fov_factor,1),camera.pos);//fire eye ray
 	eyeRay.dir = normalize(eyeRay.dir);
-	
+
 	color = intersect(eyeRay);//calculate current frame pixel color
 	pColor = texture2D(pTex, gl_FragCoord.xy/camera.res).rgb;//pixel color from pevious frame
 	gl_FragColor = vec4(mix(pColor,color,1./sampleCount), 1);//mix 2 color to achieve Antialiasing

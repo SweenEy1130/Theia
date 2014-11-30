@@ -24,7 +24,7 @@ function init(){
     	gl.depthFunc(gl.LEQUAL);                                // Near things obscure far things
     	gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);      // Clear the color as well as the depth buffer.
     }
-	
+
 	//set Camera
 	Camera.res = [canvas.width,canvas.height];
 	Camera.getRTrans();
@@ -53,9 +53,15 @@ function init(){
     Render.tex = [];
     Render.tex.push(Render.makeTexture());//render to texture
     Render.tex.push(Render.makeTexture());
+
     Render.texImage = [];
     Render.texImage.push(Render.getTexture("models/wall-texture.jpg"));
     Render.texImage.push(Render.getTexture("models/wall_norm.jpg"));
+
+    Render.waterNorm = [];
+    Render.waterNorm.push(Render.getTexture("models/640-normal.jpg"));
+    Render.waterNorm.push(Render.getTexture("models/4483-normal.jpg"));
+
     Gui.timeStart = Date.now();
     Gui.animate(0);
 }
