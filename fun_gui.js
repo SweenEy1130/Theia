@@ -54,25 +54,28 @@ var Gui = {
 
 	renderToBuffer : function()
 	{
-
-		if (Render.texImage.tex) {
-			gl.useProgram(Render.program);//draw to frame buffer
-			gl.activeTexture(gl.TEXTURE1);//enviroment texture
-			gl.uniform1i(Render.program.tex1Loc, 1);
-			gl.bindTexture(gl.TEXTURE_2D,Render.texImage.tex);
+		gl.useProgram(Render.program);
+		if (Render.texImage[0].tex) {
+			gl.activeTexture(gl.TEXTURE2);//wall texture available
+			gl.uniform1i(Render.program.wallTexLoc, 2);
+			gl.bindTexture(gl.TEXTURE_2D,Render.texImage[0].tex);
 		}
+		if (Render.texImage[1].tex) {
+			gl.activeTexture(gl.TEXTURE3);//wall norm availabe
+			gl.uniform1i(Render.program.wallNormLoc, 3);
+			gl.bindTexture(gl.TEXTURE_2D,Render.texImage[1].tex);
+		}		
 		Camera.getRTrans();//update translate mat
 		Gui.sampleCount++;
-		gl.useProgram(Render.program);
 		Render.updateShaderParams(Render.program);
 		//material as texture
-		gl.activeTexture(gl.TEXTURE2);
+		gl.activeTexture(gl.TEXTURE1);
 		gl.bindTexture(gl.TEXTURE_2D, Render.texMtl);
-		gl.uniform1i(Render.program.tex2Loc, 2);
+		gl.uniform1i(Render.program.mtlTexLoc, 1);
 		//previous render result
 		gl.activeTexture(gl.TEXTURE0);
 		gl.bindTexture(gl.TEXTURE_2D,Render.tex[0]);
-		gl.uniform1i(Render.program.tex0Loc, 0);
+		gl.uniform1i(Render.program.pTexLoc, 0);
 		//render to texture
 		gl.bindFramebuffer(gl.FRAMEBUFFER, Render.fb);
 		gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, Render.tex[1], 0);

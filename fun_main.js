@@ -53,7 +53,9 @@ function init(){
     Render.tex = [];
     Render.tex.push(Render.makeTexture());//render to texture
     Render.tex.push(Render.makeTexture());
-    Render.texImage = Render.getTexture("im_clip.jpg");
+    Render.texImage = [];
+    Render.texImage.push(Render.getTexture("models/wall-texture.jpg"));
+    Render.texImage.push(Render.getTexture("models/wall_norm.jpg"));
     Gui.timeStart = Date.now();
     Gui.animate(0);
 }

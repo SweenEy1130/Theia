@@ -39,9 +39,10 @@ var Render = {
 		program.camPosLoc = gl.getUniformLocation(program, "camera.pos");
 		program.camTransLoc = gl.getUniformLocation(this.program, "trans");
 		program.sampleCountLoc = gl.getUniformLocation(program, "sampleCount");
-		program.tex1Loc = gl.getUniformLocation(program, "tex1");//image texture
-		program.tex0Loc = gl.getUniformLocation(program, "tex0");//pevious result
-		program.tex2Loc = gl.getUniformLocation(program, "tex2");//material as texture
+		program.pTexLoc = gl.getUniformLocation(program, "pTex");//pevious result
+		program.mtlTexLoc = gl.getUniformLocation(program, "mtlTex");//material as texture
+		program.wallTexLoc = gl.getUniformLocation(program, "wallTex");//wall texture
+		program.wallNormLoc = gl.getUniformLocation(program, "wallNorm");//wall norm map
 		program.timeLoc = gl.getUniformLocation(program, "globTime");
 		program.mtlNumLoc = gl.getUniformLocation(program, "mtlNum");
 	},
@@ -84,7 +85,6 @@ var Render = {
  	 	return s;		
  	 	    
  	 },
-
  	  updateShaderParams : function(program){
  	  	gl.uniform1f(program.sampleCountLoc, Gui.sampleCount);
  	  	gl.uniform1f(program.timeLoc, (Date.now()-Gui.timeStart)/1000.);
@@ -106,7 +106,7 @@ var Render = {
  	 },
  	 makeTextureFloat : function(data){
  	 	var tex = gl.createTexture();
- 	 	var w = 4, h = data.length / w / 3; // 3 float for ks, 3 for kd 3 for (ilum, ns, 0);
+ 	 	var w = 5, h = data.length / w / 3; // 3 float for ks, 3 for kd 3 for (ilum, ns, 0);
  	 	var dataf = new Float32Array(data);
  	 	gl.bindTexture( gl.TEXTURE_2D, tex);
  	 	console.log("float texture support: " + gl.getExtension("OES_texture_float"));

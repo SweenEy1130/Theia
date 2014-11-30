@@ -18,11 +18,11 @@ struct Box{
 	vec3 min,max;
 	int mt;
 };
-struct Material{ //BRDF or something
+/*struct Material{ //BRDF or something
 	//here we use ka,kd,ks for test
 	vec3 ka,kd,ks;
 	float ns;
-};
+};*/
 struct Hit{
 	vec3 pos;
 	vec3 norm;
@@ -43,25 +43,25 @@ uniform Camera camera;
 uniform mat3 trans;
 uniform float sampleCount;
 uniform float mtlNum;
-uniform sampler2D tex0;
-uniform sampler2D tex1;
-uniform sampler2D tex2;
+uniform sampler2D pTex;//previous render result
+uniform sampler2D mtlTex;
+uniform sampler2D wallTex;
+uniform sampler2D wallNorm;
+
 uniform highp float globTime;
 //const setting
 const int BOUNCE = 3;//max bounce time
 const float EPSILON = 0.001;//tolerance
 const float INFINITY = 10000.;
 const int X = 0, Y = 1, Z = 2;
-const float KA = 0., KD = 1./3., KS = 2./3., ATTR = 1.;
 const int SAMPLE_NUM = 1;
+float KA = 0., KD = 1./mtlNum, KS = 2./mtlNum, MAP = 3./mtlNum, ATTR = 1.;
 float msample = sqrt(float(SAMPLE_NUM));
 float s;//seed for random generator
 
 //temporal vars should be uniforms
 const Light light1 = Light(vec3(-10, 9, -1), vec3(0, 2, 1), false, LIGHT_AREA, vec3(1.), vec3(1.));
 const Box room = Box(vec3(-10, -10, -20), vec3(10, 10, 20), 1);
-//Material material[4];//we use dummyMtl to init these 2 mt
-Material material;
 const int SPHERE_NUM = 5;
 Sphere sphere[SPHERE_NUM];
 
@@ -159,7 +159,7 @@ vec3 specular(vec3 L, vec3 N, vec3 V, vec3 Is, float Ns){
 	return pow(min(1.,max(dot(R, V), 0.)), Ns) * Is;
 }
 
-//simple map test !!!
+//simple map test for wall!!!
 vec2 mapfoo(vec3 pos){
 	pos.x = 0.0;//no use
 	pos.y /= room.max.y - room.min.y;
@@ -167,32 +167,38 @@ vec2 mapfoo(vec3 pos){
 	pos += 0.5;
 	pos.y = 1.0 - pos.y;
 	return pos.yz;
-	
 }
 
 vec3 lightAt(Hit hit, vec3 N, vec3 V)//calculate light at a object point
 {
-	vec3 ka = vec3(0), kd = vec3(0), ks = vec3(0), attr = vec3(0, 1, 0);
-	float ns, hasTexture; //specular power
+	vec3 ka = vec3(0), kd = vec3(0), ks = vec3(0), attr = vec3(0, 1, 0), map = vec3(0);
+	float ns; //specular power
 	int illum = 0;
 	float mtlCoord = float(hit.mt) / mtlNum;//change material index to uv coord
 	vec3 L = normalize(light1.posOrDir - hit.pos);//use point light
 	vec3 R = reflect(L, N);
 	vec3 c = vec3(0);
-	attr = texture2D(tex2, vec2(ATTR, mtlCoord)).xyz;//x->illum y->ns z->texture
+	attr = texture2D(mtlTex, vec2(ATTR, mtlCoord)).xyz;//x->illum y->ns z->texture
 	illum = int(attr.x);
-	hasTexture = attr.z;
+	
+	//map
+	map = texture2D(mtlTex, vec2(MAP, mtlCoord)).xyz;
 
-	ka = texture2D(tex2, vec2(KA, mtlCoord)).xyz;
-	kd = texture2D(tex2, vec2(KD, mtlCoord)).xyz;
+	ka = texture2D(mtlTex, vec2(KA, mtlCoord)).xyz;
+	kd = texture2D(mtlTex, vec2(KD, mtlCoord)).xyz;
 
-	if(hasTexture > 0.){
-		ka = kd = texture2D(tex1, mapfoo(hit.pos)).rgb; //here i just use one texture
+	if(map.y > 0.){//enable normal map
+		N = texture2D(wallNorm, mapfoo(hit.pos)).rgb;
+	}
+	if(map.x > 0.){ // enable texture map
+		ka = kd = texture2D(wallTex, mapfoo(hit.pos)).rgb;
+		//ka = texture2D(tex1, mapfoo(hit.pos)).rgb; //here i just use one texture
+		//ka = kd = vec3(0);
 	}
 	else if(illum == 0){
 	}
 	else if(illum == 3){ //specular colors on
-		ks = texture2D(tex2, vec2(KS, mtlCoord)).xyz;
+		ks = texture2D(mtlTex, vec2(KS, mtlCoord)).xyz;
 		ns = attr.y;
 	}
 	c += ambient(vec3(0.2)) * ka;
@@ -269,8 +275,8 @@ void main(void) {
 	eyeRay.dir = normalize(eyeRay.dir);
 	
 	color = intersect(eyeRay);
-	pColor = texture2D(tex0, gl_FragCoord.xy/camera.res).rgb;
+	pColor = texture2D(pTex, gl_FragCoord.xy/camera.res).rgb;
 	gl_FragColor = vec4(mix(pColor,color,1./sampleCount), 1);
-	//gl_FragColor = vec4(texture2D(tex2, vec2(1. / 3., 3. /mtlNum)).rgb, 1);
+	//gl_FragColor = vec4(texture2D(mtlTex, vec2(1. / 3., 3. /mtlNum)).rgb, 1);
 
 }

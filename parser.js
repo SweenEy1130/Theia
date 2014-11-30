@@ -36,7 +36,9 @@ function parseMtl(url){
         MaterialTextureData.push(L[W].Ka[0], L[W].Ka[1], L[W].Ka[2]);
 		MaterialTextureData.push(L[W].Kd[0], L[W].Kd[1], L[W].Kd[2]);
 		MaterialTextureData.push(L[W].Ks[0], L[W].Ks[1], L[W].Ks[2]);
-		MaterialTextureData.push(L[W].illum, L[W].Ns, L[W].map);
+        MaterialTextureData.push(L[W].map[0], L[W].map[1], L[W].map[2]);
+		MaterialTextureData.push(L[W].illum, L[W].Ns, 0);
+
 	}
 	return MaterialTextureData;
 }
@@ -83,8 +85,8 @@ function ObjMaterial(e) {
                             else{
                                 if(/^\s*map\s/.test(j[d])){
                                  var h = j[d].replace(/^\s*/, "").replace(/\s+/g, " ").split(" ");
-                                 this.map = parseInt(h[1]);                   
-                                }
+                                 this.map = new Float32Array([h[1], h[2], h[3]]);               
+                                }                       
                             }
                         }
                     }
