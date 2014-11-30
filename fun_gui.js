@@ -3,8 +3,6 @@ var Gui = {
 	drag : false,
 	offset : [0, 0], //newPos - oldPos
 	time : -1,
-	sampleCount: 0,
-	timeStart : 0,
 	
 	mouseDown :function (e) {
 		Gui.oldPos = [e.pageX, e.pageY];
@@ -15,7 +13,6 @@ var Gui = {
 	mouseUp: function(e){
 		Gui.drag = false;
 		Gui.oldPos = [-1, -1];
-		Camera.rotv = [0, 0, 0];
 	},
 	mouseMove : function (e) {
 		if(Gui.drag){
@@ -30,7 +27,6 @@ var Gui = {
 			Camera.rotate = math.add(Camera.rotate,[Gui.offset[1] , Gui.offset[0] , 0]);
 			Camera.rotate[0] = math.min(math.max(Camera.rotate[0], -89), 89);//constrain u can not do upsidedown
 			Camera.rotate[1] = Camera.rotate[1] > 180 ? Camera.rotate[1] - 360 : Camera.rotate[1];
-			Gui.sampleCount = 0;
 			
 		}
 
@@ -40,50 +36,30 @@ var Gui = {
 		{
 			case 38://UP
 			case 87:
-				Camera.pos[2] += Camera.rotate[1] < 90 && Camera.rotate[1] > -90 ? 0.1 : -0.1;
-				Gui.sampleCount = 0;
+				Camera.pos[2] += Camera.rotate[1] < 90 && Camera.rotate[1] > -90 ? 0.5 : -0.5;
 				break;
 			case 40://DOWN
 			case 83:
-				Camera.pos[2] += Camera.rotate[1] < 90 && Camera.rotate[1] > -90 > 0 ? -0.1 : 0.1 ;
-				Gui.sampleCount = 0;
+				Camera.pos[2] += Camera.rotate[1] < 90 && Camera.rotate[1] > -90 > 0 ? -0.5 : 0.5 ;
 				break;
 		}
+		Render.updateShaderParams(gl);
 
 	},
 	animate : function(time) {
-
-		if (Render.texImage.tex) {
-			gl.useProgram(Render.program);//draw to frame buffer
-			gl.activeTexture(gl.TEXTURE1);//enviroment texture
-			gl.uniform1i(Render.program.tex1Loc, 1);
-			gl.bindTexture(gl.TEXTURE_2D,Render.texImage.tex);
+		if (Render.texture.webglTexture) {
+			gl.activeTexture(gl.TEXTURE0);
+			gl.bindTexture(gl.TEXTURE_2D,Render.texture.webglTexture);
 		}
-		Camera.getRTrans();//update translate mat
-		Gui.sampleCount++;
-		//draw to frame buffer
-		gl.useProgram(Render.program);
-		Render.updateShaderParams(Render.program);
-		gl.activeTexture(gl.TEXTURE0);//previous render result
-		gl.bindTexture(gl.TEXTURE_2D,Render.tex[0]);
-		gl.uniform1i(Render.program.tex0Loc, 0);
-		gl.bindFramebuffer(gl.FRAMEBUFFER, Render.fb);
-		gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, Render.tex[1], 0);
-		gl.enableVertexAttribArray(Render.program);		
+
+		Render.updateShaderParams(gl);
+
+		gl.enableVertexAttribArray(Render.program);
 		gl.vertexAttribPointer(Render.program.cVertex, 2, gl.FLOAT, false, 0, 0);
 		gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 		gl.disableVertexAttribArray(Render.program);
-		//draw to screen
-		gl.useProgram(Render.drawProg);
-		gl.enableVertexAttribArray(Render.drawProg);
-		gl.vertexAttribPointer(Render.drawProg.cVertex, 2, gl.FLOAT, false, 0, 0);	
-		gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-		gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-		gl.disableVertexAttribArray(Render.program);
-		//flip texture
-		Render.tex.reverse();//swap 2 element
 		//gl.flush();
+
 		window.requestAnimationFrame(Gui.animate);
-		
   }
 }

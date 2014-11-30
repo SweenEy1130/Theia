@@ -1,11 +1,480 @@
 <head>
 <script type="text/javascript" src = "math.min.js"></script>
-<script type="text/javascript" src = "jquery-2.1.1.min.js"></script>
+<!--shades-->
+<script id="shader-vs" type="x-shader/x-vertex">
+attribute vec2 cVertex;//quad vetices
+varying vec3 dir;//eye ray direction
+uniform float fov;//field of view, camera param
+uniform float ratio;//xres/yres
+uniform mat3 rtrans;//translate eye ray from camera space to world space
+void main(void) {
+	float fov_factor = tan( radians( fov /2.0) ) ;
+	gl_Position =  vec4(cVertex, 0, 1.0);
+	dir = rtrans * vec3( cVertex.x * fov_factor * ratio, cVertex.y * fov_factor, 1);//generate eye ray
+}
+</script>
+
+<script id="shader-fs" type="x-shader/x-fragment">
+precision mediump float;
+uniform vec3 cameraPos;//camera position
+varying vec3 dir;//eye ray direction
+const int bounce = 3;//max bounce time
+const float epsilon = 0.001;//tolerance
+uniform vec3 rot, rotv;
+
+uniform sampler2D texture_wall;
+
+//temporal vars
+const vec3 lightSource = vec3(-8, 8, -2);//position of light
+const vec3 sphere1Center = vec3(0, 0, 0);
+const vec3 sphere2Center = vec3(3, 1, 3);
+const float r = 1.0;//radius of sphere;
+vec3 roomMin = vec3(-10, -10, -20), roomMax = vec3(10, 10, 20);//room box defined with "slab" algorithm
+float voxelLength = 1.0;
+int accelerateData[16000];
+float tri[9];
+
+
+//some uti
+const int X = 0, Y = 1, Z = 2;
+mat3 getRotMat(float degree, int choice){
+	float rad = radians(degree);
+	if(choice == X)
+		return 	mat3(1, 0, 0, 0, cos(rad), -sin(rad), 0, sin(rad), cos(rad));
+	else if ( choice == Y )
+		return mat3(cos(rad), 0, sin(rad), 0, 1, 0, -sin(rad), 0, cos(rad));
+	else return mat3(1, 0, 0, 0, 1, 0, 0, 0, 1);
+}
+
+vec2 intersectBox(vec3 origin, vec3 dir, vec3 boxMin, vec3 boxMax){//ray box intersect
+	vec3 tMin = (boxMin - origin) / dir;
+	vec3 tMax = (boxMax - origin) / dir;
+	vec3 t1 = min(tMin, tMax);
+	vec3 t2 = max(tMin, tMax);
+	float tNear = max(max(t1.x, t1.y), t1.z);
+	float tFar = min(min(t2.x, t2.y), t2.z);
+	return vec2(tNear, tFar);
+}
+
+vec3 normalForBox(vec3 hit, vec3 boxMin, vec3 boxMax){
+	if(hit.x < boxMin.x + epsilon ) return vec3(-1.0, 0.0, 0.0);//box left
+	else if(hit.x > boxMax.x -  epsilon) return vec3(1.0, 0.0, 0.0);//box right
+	else if(hit.y < boxMin.y +  epsilon ) return vec3(0.0, -1.0, 0.0);//box bottom
+	else if(hit.y > boxMax.y - epsilon) return vec3(0.0, 1.0, 0.0);//box top
+	else if(hit.z < boxMin.z + epsilon ) return vec3(0.0, 0.0, -1.0);//box front
+	else return vec3(0.0, 0.0, 1.0);//box back
+	return vec3(0.0, 0.0, 1.0);
+}
+bool intersectSphere(vec3 center, vec3 origin, vec3 dir, out float dist) {
+	vec3 c = center - origin;
+	float b = dot(dir, c);
+	if(b < 0.0)
+	return false;
+	float d = dot(c, c) - b*b;
+	if(d < 0.0 || d > r*r)
+	return false;
+	dist = b- sqrt(r*r- d);
+	return true;
+}
+
+vec3 ambient(vec3 color){
+	return color;
+}
+vec3 diffuse(vec3 L, vec3 N, vec3 color){
+	return dot(L, N) * color;
+}
+vec3 specular(vec3 L, vec3 N, vec3 V, vec3 color){
+	vec3 R = reflect(L, N);
+	return pow(max(dot(R, V), 0.0), 30.0) * color;
+}
+
+//simple map test !!!
+vec2 mapfoo(vec3 pos){
+	pos.x = 0.0;//no use
+	pos.y /= roomMax.y - roomMin.y;
+	pos.z /= roomMax.z - roomMin.z;
+	pos += 0.5;
+	pos.y = 1.0 - pos.y;
+	return pos.yz;
+}
+
+vec3 lightAt(vec3 hit, vec3 N, vec3 V, int obj)//calculate light at a object point
+{
+	//vec3 L = lightSource;
+	vec3 ka = vec3(0.3), ks = vec3(0.4), kd = vec3(0.3);
+	vec3 L = normalize(lightSource - hit);//use point light
+	vec3 R = reflect(L, N);
+	vec3 c = vec3(0);
+	vec2 uv;
+
+	if(obj == 0)
+	kd = ka = vec3(0, 0, 0.5);
+	else if(abs(N.x) == 1.0)
+		kd = ka = texture2D(texture_wall, mapfoo(hit)).xyz;
+	else if(N.y == 1.0)
+		{ks = ka = vec3(1); kd = vec3(0);}
+	else
+		kd = ka = vec3(0.5, 0, 0);
+
+	c += ambient(vec3(0.2)) * ka;
+
+	float dist;
+	vec3 stoLight;
+
+	stoLight = lightSource - hit;
+
+	if(intersectSphere(sphere1Center, hit , normalize(stoLight), dist)  && dist < length(stoLight) )//intersect any object, blocked
+		return c;
+	c += diffuse(L, N, vec3(1) )* kd;
+	c += specular(L, N, V, vec3(1) )*  ks;
+
+	return c;
+}
+
+
+bool ApointInTri(vec3 a, vec3 b ,vec3 c, vec3 hitPoint){
+	float P[3],A[3],B[3],C[3];
+	P[0] = hitPoint.x;
+	P[1] = hitPoint.y;
+	P[2] = hitPoint.z;
+	A[0] = a.x; A[1] = a.y; A[2] = a.z;
+	B[0] = b.x; B[1] = b.y; b[2] = b.z;
+	C[0] = c.x; C[1] = c.y; C[2] = c.z;
+	float v0[3],v1[3],v2[3];
+	for(int i = 0 ; i < 3 ; ++i){
+		v0[i] = C[i] - A[i];
+ 		v1[i] = B[i] - A[i];
+  		v2[i] = P[i] - A[i];
+	}
+
+	float dot00 = v0[0] * v0[0] + v0[1] * v0[1];
+	float dot01 = v0[0] * v1[0] + v0[1] * v1[1];
+  	float dot02 = v0[0] * v2[0] + v0[1] * v2[1];
+  	float dot11 = v1[0] * v1[0] + v1[1] * v1[1];
+  	float dot12 = v1[0] * v2[0] + v1[1] * v2[1];
+
+  	float inverDeno = 1.0 / (dot00 * dot11 - dot01 * dot01);
+  	float u = (dot11 * dot02 - dot01 * dot12) * inverDeno;
+
+  	if(u < 0.0 || u > 1.0)
+ 		return false;
+ 	float v = (dot00 * dot12 - dot01 * dot02) * inverDeno;
+ 	if(v < 0.0 || v > 1.0)
+ 		return false;
+ 	return (u + v <= 1.0); 
+}
+
+bool AsegmentInterTri(vec3 tri1, vec3 tri2, vec3 tri3, vec3 point1, vec3 point2, out vec3 hitPoint){
+	float tri[9];
+	tri[0] = tri1.x; tri[1] = tri1.y; tri[2] = tri1.z;
+	tri[3] = tri2.x; tri[4] = tri2.y; tri[5] = tri2.z;
+	tri[6] = tri3.x; tri[7] = tri3.y; tri[8] = tri3.z;
+	float a = (tri[4] - tri[1]) * (tri[8] - tri[2]) - (tri[7] - tri[1]) * (tri[5] - tri[2]);
+ 	float b = (tri[5] - tri[2]) * (tri[6] - tri[0]) - (tri[8] - tri[2]) * (tri[3] - tri[0]);
+ 	float c = (tri[3] - tri[0]) * (tri[7] - tri[1]) - (tri[6] - tri[0]) * (tri[4] - tri[1]);
+ 	
+ 	float norm[3];
+ 	float vpt = norm[0] * a + norm[1] * b + norm[2] * c;
+ 	if(vpt == 0.0)
+ 		return false;
+ 	else{
+ 		float t = ((tri[0] - point1.x) * a + (tri[1] - point1.y) *  b + (tri[2] - point1.z) * c) / vpt;
+ 		hitPoint.x = point1.x + norm[0] * t;
+ 		hitPoint.y = point1.y + norm[1] * t;
+ 		hitPoint.z = point1.z + norm[2] * t;
+
+ 		float min,max;
+ 		if(point1.x < point2.x)
+ 			{ min = point1.x; max = point2.x; }
+ 		else
+ 			{ min = point2.x; max = point1.x; }
+ 		if(hitPoint.x < min || hitPoint.x > max)
+ 			return false;
+ 		return false;
+ 		float triPoint[9];
+ 		for(int i = 0 ; i < 3 ; ++i){
+ 			triPoint[i*3 + 0] = tri[i*3];
+ 			triPoint[i*3 + 1] = tri[i*3+1];
+        	triPoint[i*3 + 2] = tri[i*3+2];
+ 		}
+ 		vec3 TriPoint1,TriPoint2,TriPoint3;
+ 		TriPoint1.x = triPoint[0]; TriPoint1.y = triPoint[1]; TriPoint1.z = triPoint[2];
+ 		TriPoint2.x = triPoint[3]; TriPoint2.y = triPoint[4]; TriPoint2.z = triPoint[5];
+ 		TriPoint3.x = triPoint[6]; TriPoint3.y = triPoint[7]; TriPoint3.z = triPoint[8];
+ 		return ApointInTri(TriPoint1,TriPoint2,TriPoint3,hitPoint);  
+ 	} 
+}
+
+int Model(int i, int j){
+	return i - int(i/j)*j;
+}
+
+bool AsementInterCore(vec3 origin, vec3 point, vec3 core, int model, out int outModel, out vec3 hitPoint){
+	float vertex[12];
+	float tempCore[3];
+	float Core[3];
+	Core[0] = core.x;
+	Core[1] = core.y;
+	Core[2] = core.z;
+
+	for(int i = 0 ; i < 6 ; ++i){
+		outModel = 1;
+		if(int(model/2) == int(i / 2) && model != i)
+			continue;
+		tempCore[0] = core.x;
+		tempCore[1] = core.y;
+		tempCore[2] = core.z;
+
+		float sign,sign1;
+		if(Model(i,2) == 0)
+			sign = 1.0;
+		else
+			sign = -1.0;
+		tempCore[int(i/2)] = tempCore[int(i/2)] + sign * voxelLength/2.0;
+
+		for(int m = 0 ; m < 4 ; ++m){
+			if(Model(m,2) == 0)
+				sign = 1.0;
+			else
+				sign = -1.0;
+
+			if(Model(int(m/2),2) == 0)
+				sign1 = 1.0;
+			else
+				sign1 = -1.0;
+
+			vertex[m*3 + Model(int(i/2),3)] = Core[Model(int(i/2),3)];
+			vertex[m*3 + Model(int(i/2+1),3)] = Core[Model(int(i/2+1),3)] + sign * voxelLength/2.0;
+			vertex[m*3 + Model(int(i/2+2),3)] = Core[Model(int(i/2+2),3)] + sign1 * voxelLength/2.0;
+		}
+
+		float triOfFace[9];
+		for(int p = 0 ; p < 2 ; ++p){
+			for(int m = 0 ; m < 3 ; ++m)
+				for(int n = 0 ; n < 3 ; ++n)
+					triOfFace[m*3+n] = vertex[Model((m+p),4)*3 + n];
+			vec3 tri1,tri2,tri3;
+			tri1.x = triOfFace[0]; tri1.y = triOfFace[1]; tri1.z = triOfFace[2];
+			tri2.x = triOfFace[3]; tri2.y = triOfFace[4]; tri2.z = triOfFace[5];
+			tri3.x = triOfFace[6]; tri3.y = triOfFace[7]; tri3.z = triOfFace[8];
+			bool result  = AsegmentInterTri(tri1,tri2,tri3,origin,point,hitPoint);
+			if(result)
+				return true; 
+		} 
+	}  
+	return false;  
+}
+
+bool AintersectBox(vec3 origin, vec3 dir, out vec3 hitPoint, out vec3 hitNormal){
+	float perX = 3.0 * voxelLength * dir.x / sqrt(dir.x * dir.x + dir.y * dir.y + dir.z * dir.z);
+	float perY = 3.0 * voxelLength * dir.y / sqrt(dir.x * dir.x + dir.y * dir.y + dir.z * dir.z);
+	float perZ = 3.0 * voxelLength * dir.z / sqrt(dir.x * dir.x + dir.y * dir.y + dir.z * dir.z);
+	float core[3];
+	vec3 NextPoint;
+	int model = -1;
+
+	core[0] = float(int((origin.x-roomMin.x)/voxelLength)) * voxelLength + roomMin.x + voxelLength/2.0;
+    core[1] = float(int((origin.y-roomMin.y)/voxelLength)) * voxelLength + roomMin.y + voxelLength/2.0;
+    core[2] = float(int((origin.z-roomMin.z)/voxelLength)) * voxelLength + roomMin.z + voxelLength/2.0;
+
+    NextPoint.x = origin.x + perX;
+    NextPoint.y = origin.y + perY;
+    NextPoint.z = origin.z + perZ;
+    vec3 CCore;
+    CCore.x = core[0]; CCore.y = core[1] ; CCore.z = core[2];
+
+    bool hitResult,whileT = true;
+    hitResult = AsementInterCore(origin,NextPoint,CCore,model,model,hitPoint);    
+    return false;	
+       for(int i = 0 ; i < 1; --i){
+    	if(hitResult == false)
+    		return false;
+    	float sign;
+    	if(Model(model,2) == 0)
+    		sign = 1.0;
+    	else
+    		sign = -1.0;
+    	if(int(model/2) == 0)
+    		core[0] = core[0] + sign * voxelLength;
+    	else if(int(model/2) == 1)
+    		core[1] = core[1] + sign * voxelLength;
+    	else
+    		core[2] = core[2] + sign * voxelLength; 
+    	if(core[0] > roomMax.x || core[0] < roomMin.x || core[1] > roomMax.y || core[1] < roomMin.y || core[2] > roomMax.z || core[2] < roomMin.z)
+          return false; 
+      	float perx = float(int((roomMax.x - roomMin.x)/voxelLength));
+        float pery = float(int((roomMax.y - roomMin.y)/voxelLength));
+        int voxelID = int((core[2]-roomMin.z)/voxelLength * perx * pery) + int((core[1] - roomMin.y)/voxelLength * perx) + int((core[0] - roomMin.x)/voxelLength);
+        NextPoint.x = hitPoint.x + perX;
+        NextPoint.y = hitPoint.y + perY;
+        NextPoint.z = hitPoint.z + perZ;
+        CCore.x = core[0]; CCore.y = core[1] ; CCore.z = core[2];
+        hitResult = AsementInterCore(origin,NextPoint,CCore,model,model,hitPoint);
+      if(!(voxelID  == 7789 ||
+voxelID  == 8189
+|| voxelID  == 8589
+|| voxelID  == 8989
+|| voxelID  == 7809
+|| voxelID  == 8209
+|| voxelID  == 8609
+|| voxelID  == 9009
+|| voxelID  == 7790
+|| voxelID  == 8190
+|| voxelID  == 8590
+|| voxelID  == 8990
+|| voxelID  == 7810
+|| voxelID  == 8210
+|| voxelID  == 8610
+|| voxelID  == 9010
+|| voxelID  == 7791
+|| voxelID  == 8191
+|| voxelID  == 8591
+|| voxelID  == 8991
+|| voxelID  == 7811
+|| voxelID  == 8211
+|| voxelID  == 8611
+|| voxelID  == 9011)){        
+             hitResult = AsementInterCore(origin,NextPoint,CCore,model,model,hitPoint);
+          }
+ 	      else
+ 		  {
+          //%%% get each tri in accelerateData[voxelID]
+          //%%% z buffer
+          vec3 tri1,tri2,tri3;
+		  tri1.x = tri[0]; tri1.y = tri[1]; tri1.z = tri[2];
+		  tri2.x = tri[3]; tri2.y = tri[4]; tri2.z = tri[5];
+		  tri3.x = tri[6]; tri3.y = tri[7]; tri3.z = tri[8];
+          hitResult = AsegmentInterTri(tri1,tri2,tri3,hitPoint,NextPoint,hitPoint);
+          if(hitResult)
+          {
+            float a = (tri[4] - tri[1]) * (tri[8] - tri[2]) - (tri[7] - tri[1]) * (tri[5] - tri[2]);
+            float b = (tri[5] - tri[2]) * (tri[6] - tri[0]) - (tri[8] - tri[2]) * (tri[3] - tri[0]);
+            float c = (tri[3] - tri[0]) * (tri[7] - tri[1]) - (tri[6] - tri[0]) * (tri[4] - tri[1]);
+            hitNormal.x = a;
+            hitNormal.y = b;
+            hitNormal.z = c;
+            return true;
+          } 
+        }   
+      }  
+    }
+
+vec3 intersect(vec3 origin, vec3 dir){//main ray bounce function
+	vec3 color = vec3(0),ncolor, norm, hit, stoLight;
+	vec3 dl, al, sl;
+	vec2 room;
+	bool stop = false;
+	float dist;
+	for(int i = 0; i < bounce; i++){
+		if(stop)
+			break;
+
+		if(AintersectBox(origin,dir,hit,norm)){
+			ncolor = lightAt(hit,norm,dir,0);
+			stop = true;
+		}
+
+		if(intersectSphere(sphere2Center, origin, dir, dist)){
+			hit = origin + dist * dir;
+			norm = normalize(hit - sphere2Center);
+			ncolor = lightAt(hit, norm, dir, 0);
+			stop = true;
+		}
+/*		else if(intersectSphere(sphere1Center, origin, dir, dist)){
+			hit = origin + dist * dir;
+			norm = normalize(hit - sphere1Center);
+			ncolor = lightAt(hit, norm, dir, 0);
+			stop = true;
+		} */
+		else{//wall can't block sphere
+			room = intersectBox(origin,dir, roomMin,roomMax);
+			if(room.x <= room.y){//hit box
+				hit = origin + room.y * dir;
+				norm = normalForBox(hit, roomMin, roomMax);
+				ncolor = lightAt(hit, -norm, dir, 1);//calculate inner color
+				dist = room.y;
+				stop = hit.y < roomMin.y + epsilon ? false : true;
+			}
+		}
+		color = i==0 ? ncolor : color * 0.5 +  ncolor * 0.5;
+		//generate new ray
+		origin = origin + dist * dir;
+		dir = reflect(dir, norm);
+	}
+/*	for(int i = 0; i < bounce; i++){//test bounding box
+		if(stop)
+		break;
+
+		room = intersectBox(origin,dir, roomMin,roomMax);
+		if(room.x <= room.y){//hit box
+			hit = origin + room.y * dir;
+			norm = normalForBox(hit, roomMin, roomMax);
+			ncolor = lightAt(-norm, -dir, vec3(0,1,0));//calculate inner color
+			dist = room.y;
+			stop = hit.y < roomMin.y + epsilon ? true : true;
+		}
+		color = i==0 ? ncolor : color * 0.8 +  ncolor * 0.2;
+		origin = origin + dist * dir;
+		dir = reflect(dir, norm);
+	}*/
+	return color;
+}
+
+const int SAMPLE_NUM = 24;
+void main(void) {
+	tri[0] = 1.5;
+ 		tri[1] = 0.5;
+ 		tri[2] = -0.5;
+ 		tri[3] = -0.5;
+ 		tri[4] = 0.5;
+ 		tri[5] = 2.5;
+ 		tri[6] = 0.5;
+ 		tri[7] = -0.5;
+ 		tri[8] = -0.5;
+ 	accelerateData[7789] = 1;
+	accelerateData[8189] = 1;
+accelerateData[8589] = 1;
+accelerateData[8989] = 1;
+accelerateData[7809] = 1;
+accelerateData[8209] = 1;
+accelerateData[8609] = 1;
+accelerateData[9009] = 1;
+accelerateData[7790] = 1;
+accelerateData[8190] = 1;
+accelerateData[8590] = 1;
+accelerateData[8990] = 1;
+accelerateData[7810] = 1;
+accelerateData[8210] = 1;
+accelerateData[8610] = 1;
+accelerateData[9010] = 1;
+accelerateData[7791] = 1;
+accelerateData[8191] = 1;
+accelerateData[8591] = 1;
+accelerateData[8991] = 1;
+accelerateData[7811] = 1;
+accelerateData[8211] = 1;
+accelerateData[8611] = 1;
+accelerateData[9011] = 1;
+	vec3 cameraDir, color = vec3(0);
+	float fi;
+	for(int i = 0; i < SAMPLE_NUM; ++i){
+		fi = float(i) / float(SAMPLE_NUM) / 12.;
+		cameraDir = normalize(getRotMat(rot.x + rotv.x * fi , X) * getRotMat(rot.y + rotv.y * fi, Y)  * dir);
+		color += intersect(cameraPos, cameraDir) / float(SAMPLE_NUM);		
+	}
+
+	gl_FragColor = vec4(color, 1);
+}
+
+
+
+
+</script>
 <script type = "text/javascript"  src = "fun_uti.js"></script>
 <script type = "text/javascript" src = "fun_render.js"></script>
 <script type = "text/javascript"  src = "fun_gui.js"></script>
 <script type = "text/javascript" src = "fun_main.js"></script>
-</script>
+<script type = "text/javascript" src = "accelerate.js"></script>
 </head>
 <body>
 <canvas id = "canv"></canvas>
