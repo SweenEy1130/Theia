@@ -65,83 +65,84 @@ var Render = {
 		}
 		return program;
 	},
- 	 getShader : function(url, type){
- 	 	var ss;//shaderScript
- 	 	$.ajax({//load file to string
- 	 		dataType: "text",
- 	 		url: url,
- 	 		async: false,//synchronically load file
- 	 		success: function(data){
- 	 			ss = data;
- 	 		},
- 	 		error:function(){
- 	 			console.log("unable to load glsl");
- 	 		}
- 	 	});
+	 getShader : function(url, type){
+		var ss;//shaderScript
+		$.ajax({//load file to string
+			dataType: "text",
+			url: url,
+			async: false,//synchronically load file
+			success: function(data){
+				ss = data;
+			},
+			error:function(){
+				console.log("unable to load glsl");
+			}
+		});
 
- 	 	var s = gl.createShader(type);
- 	 	gl.shaderSource(s, ss);
- 	 	gl.compileShader(s);
-  	 	// See if it compiled successfully
- 	 	if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
- 	 		alert("Compile Error in " + url+ ":" + gl.getShaderInfoLog(s));
- 	 		return null;
- 	 	}
- 	 	return s;
+		var s = gl.createShader(type);
+		gl.shaderSource(s, ss);
+		gl.compileShader(s);
+		// See if it compiled successfully
+		if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+			alert("Compile Error in " + url+ ":" + gl.getShaderInfoLog(s));
+			return null;
+		}
+		return s;
 
- 	 },
- 	  updateShaderParams : function(program){
- 	  	gl.uniform1f(program.sampleCountLoc, Gui.sampleCount);//number of samples achieved for antialiasing
- 	  	gl.uniform1f(program.timeLoc, (Date.now()-Gui.timeStart)/1000.);//time since start, seconds
- 	 	gl.uniform1f(program.camFovLoc, Math.tan(Uti.radians(Camera.fov/2)));//camera field of view
- 	 	gl.uniform2fv(program.camResLoc, Camera.res);//screen resolution
- 	 	gl.uniform3fv(program.camPosLoc, Camera.pos);//camera position
- 	 	gl.uniformMatrix3fv(program.camTransLoc, false, Uti.flat(Camera.rtrans));//transform matrix for camera to world
- 	 	//gl.uniform3fv(gl.getUniformLocation(this.program, "camera.rotv"), Camera.rotv);
- 	 },
+	},
+	updateShaderParams : function(program){
+		gl.uniform1f(program.sampleCountLoc, Gui.sampleCount);//number of samples achieved for antialiasing
+		gl.uniform1f(program.timeLoc, (Date.now()-Gui.timeStart)/1000.);//time since start, seconds
+		gl.uniform1f(program.camFovLoc, Math.tan(Uti.radians(Camera.fov/2)));//camera field of view
+		gl.uniform2fv(program.camResLoc, Camera.res);//screen resolution
+		gl.uniform3fv(program.camPosLoc, Camera.pos);//camera position
+		gl.uniformMatrix3fv(program.camTransLoc, false, Uti.flat(Camera.rtrans));//transform matrix for camera to world
+		//gl.uniform3fv(gl.getUniformLocation(this.program, "camera.rotv"), Camera.rotv);
+	},
 
- 	 makeTexture : function() { //render to texture
- 	 	var tex = gl.createTexture();
- 	 	gl.bindTexture( gl.TEXTURE_2D, tex );
- 	 	gl.texParameteri( gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST );
- 	 	gl.texParameteri( gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST );
- 	 	gl.texImage2D( gl.TEXTURE_2D, 0, gl.RGB, Camera.res[0], Camera.res[1], 0, gl.RGB, gl.UNSIGNED_BYTE, null );
- 	 	gl.bindTexture( gl.TEXTURE_2D, null );
- 	 	return tex;
- 	 },
- 	 makeTextureFloat : function(data){//get texture from array, used for materials
- 	 	var tex = gl.createTexture();
- 	 	var w = 5; //5 vec3: ka, kd, ks, attr, map
- 	 	var h = data.length / w / 3; // vec3 takes 3 floats
- 	 	var dataf = new Float32Array(data);
- 	 	gl.bindTexture( gl.TEXTURE_2D, tex);
- 	 	console.log("float texture support: " + gl.getExtension("OES_texture_float"));//inorder to use float texture
+	 makeTexture : function() { //render to texture
+		var tex = gl.createTexture();
+		gl.bindTexture( gl.TEXTURE_2D, tex );
+		gl.texParameteri( gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST );
+		gl.texParameteri( gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST );
+		gl.texImage2D( gl.TEXTURE_2D, 0, gl.RGB, Camera.res[0], Camera.res[1], 0, gl.RGB, gl.UNSIGNED_BYTE, null );
+		gl.bindTexture( gl.TEXTURE_2D, null );
+		return tex;
+	 },
+
+	makeTextureFloat : function(data){//get texture from array, used for materials
+		var tex = gl.createTexture();
+		var w = 5; //5 vec3: ka, kd, ks, attr, map
+		var h = data.length / w / 3; // vec3 takes 3 floats
+		var dataf = new Float32Array(data);
+		gl.bindTexture( gl.TEXTURE_2D, tex);
+		console.log("float texture support: " + gl.getExtension("OES_texture_float"));//inorder to use float texture
 		console.log("linear texture support: " + gl.getExtension("OES_texture_float_linear"));//inorder to use NPOT texture
 		gl.texParameteri( gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST );
 		gl.texParameteri( gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST );
- 	 	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); //Prevents s-coordinate wrapping.inorder to use NPOT texture
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); //Prevents s-coordinate wrapping.inorder to use NPOT texture
 		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE); //Prevents t-coordinate wrapping.inorder to use NPOT texture
- 	 	gl.texImage2D( gl.TEXTURE_2D, 0, gl.RGB, w, h, 0, gl.RGB, gl.FLOAT, dataf);
- 	 	gl.bindTexture(gl.TEXTURE_2D, null);
- 	 	this.mtlNum = h - 1;//inorder to map material index to [0, 1];
- 	 	return tex;
- 	 },
- 	 getTexture : function(src){ //get texture from an image
- 	 	var texImage = new Image();
- 	 	texImage.src = src;
- 	 	texImage.onload = function(e) {
- 	 		var texture=gl.createTexture();
- 	 		gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
- 	 		gl.bindTexture(gl.TEXTURE_2D, texture);
- 	 		gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, this);
- 	 		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
- 	 		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST_MIPMAP_LINEAR);
- 	 		gl.generateMipmap(gl.TEXTURE_2D);
- 	 		gl.bindTexture(gl.TEXTURE_2D, null);//free texture0
- 	 		this.tex = texture;
- 	 	}
- 	 	return texImage;
- 	 }
+		gl.texImage2D( gl.TEXTURE_2D, 0, gl.RGB, w, h, 0, gl.RGB, gl.FLOAT, dataf);
+		gl.bindTexture(gl.TEXTURE_2D, null);
+		this.mtlNum = h - 1;//inorder to map material index to [0, 1];
+		return tex;
+	},
+	getTexture : function(src){ //get texture from an image
+		var texImage = new Image();
+		texImage.src = src;
+		texImage.onload = function(e) {
+			var texture=gl.createTexture();
+			gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+			gl.bindTexture(gl.TEXTURE_2D, texture);
+			gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, this);
+			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST_MIPMAP_LINEAR);
+			gl.generateMipmap(gl.TEXTURE_2D);
+			gl.bindTexture(gl.TEXTURE_2D, null);//free texture0
+			this.tex = texture;
+		}
+		return texImage;
+	}
 }
 
 

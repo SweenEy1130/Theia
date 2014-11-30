@@ -38,13 +38,19 @@ var Gui = {
 	keyDown : function(e) {
 		switch(e.keyCode)
 		{
+			case 37:
+				Camera.pos[0] += Camera.rotate[1] < 90 && Camera.rotate[1] > -90 > 0 ? -0.1 : 0.1 ;
+				Gui.sampleCount = 0;
+				break;
 			case 38://UP
-			case 87:
 				Camera.pos[2] += Camera.rotate[1] < 90 && Camera.rotate[1] > -90 ? 0.1 : -0.1; //if turn a round up and down flip
 				Gui.sampleCount = 0;
 				break;
+			case 39:
+				Camera.pos[0] += Camera.rotate[1] < 90 && Camera.rotate[1] > -90 ? 0.1 : -0.1; //if turn a round up and down flip
+				Gui.sampleCount = 0;
+				break;
 			case 40://DOWN
-			case 83:
 				Camera.pos[2] += Camera.rotate[1] < 90 && Camera.rotate[1] > -90 > 0 ? -0.1 : 0.1 ;
 				Gui.sampleCount = 0;
 				break;

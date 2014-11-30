@@ -1,4 +1,92 @@
 precision mediump float;
+
+// Perlin noise code
+vec3 mod289(vec3 x){
+	return x - floor(x * (1.0 / 289.0)) * 289.0;
+}
+vec4 mod289(vec4 x){
+	return x - floor(x * (1.0 / 289.0)) * 289.0;
+}
+vec4 permute(vec4 x){
+	return mod289(((x*34.0)+1.0)*x);
+}
+vec4 taylorInvSqrt(vec4 r){
+	return 1.79284291400159 - 0.85373472095314 * r;
+}
+vec3 fade(vec3 t) {
+	return t*t*t*(t*(t*6.0-15.0)+10.0);
+}
+
+// Classic Perlin noise, periodic variant
+float pnoise(vec3 P, vec3 rep)
+{
+	vec3 Pi0 = mod(floor(P), rep); // Integer part, modulo period
+	vec3 Pi1 = mod(Pi0 + vec3(1.0), rep); // Integer part + 1, mod period
+	Pi0 = mod289(Pi0);
+	Pi1 = mod289(Pi1);
+	vec3 Pf0 = fract(P); // Fractional part for interpolation
+	vec3 Pf1 = Pf0 - vec3(1.0); // Fractional part - 1.0
+	vec4 ix = vec4(Pi0.x, Pi1.x, Pi0.x, Pi1.x);
+	vec4 iy = vec4(Pi0.yy, Pi1.yy);
+	vec4 iz0 = Pi0.zzzz;
+	vec4 iz1 = Pi1.zzzz;
+
+	vec4 ixy = permute(permute(ix) + iy);
+	vec4 ixy0 = permute(ixy + iz0);
+	vec4 ixy1 = permute(ixy + iz1);
+
+	vec4 gx0 = ixy0 * (1.0 / 7.0);
+	vec4 gy0 = fract(floor(gx0) * (1.0 / 7.0)) - 0.5;
+	gx0 = fract(gx0);
+	vec4 gz0 = vec4(0.5) - abs(gx0) - abs(gy0);
+	vec4 sz0 = step(gz0, vec4(0.0));
+	gx0 -= sz0 * (step(0.0, gx0) - 0.5);
+	gy0 -= sz0 * (step(0.0, gy0) - 0.5);
+
+	vec4 gx1 = ixy1 * (1.0 / 7.0);
+	vec4 gy1 = fract(floor(gx1) * (1.0 / 7.0)) - 0.5;
+	gx1 = fract(gx1);
+	vec4 gz1 = vec4(0.5) - abs(gx1) - abs(gy1);
+	vec4 sz1 = step(gz1, vec4(0.0));
+	gx1 -= sz1 * (step(0.0, gx1) - 0.5);
+	gy1 -= sz1 * (step(0.0, gy1) - 0.5);
+
+	vec3 g000 = vec3(gx0.x,gy0.x,gz0.x);
+	vec3 g100 = vec3(gx0.y,gy0.y,gz0.y);
+	vec3 g010 = vec3(gx0.z,gy0.z,gz0.z);
+	vec3 g110 = vec3(gx0.w,gy0.w,gz0.w);
+	vec3 g001 = vec3(gx1.x,gy1.x,gz1.x);
+	vec3 g101 = vec3(gx1.y,gy1.y,gz1.y);
+	vec3 g011 = vec3(gx1.z,gy1.z,gz1.z);
+	vec3 g111 = vec3(gx1.w,gy1.w,gz1.w);
+
+	vec4 norm0 = taylorInvSqrt(vec4(dot(g000, g000), dot(g010, g010), dot(g100, g100), dot(g110, g110)));
+	g000 *= norm0.x;
+	g010 *= norm0.y;
+	g100 *= norm0.z;
+	g110 *= norm0.w;
+	vec4 norm1 = taylorInvSqrt(vec4(dot(g001, g001), dot(g011, g011), dot(g101, g101), dot(g111,	g111)));
+	g001 *= norm1.x;
+	g011 *= norm1.y;
+	g101 *= norm1.z;
+	g111 *= norm1.w;
+
+	float n000 = dot(g000, Pf0);
+	float n100 = dot(g100, vec3(Pf1.x, Pf0.yz));
+	float n010 = dot(g010, vec3(Pf0.x, Pf1.y, Pf0.z));
+	float n110 = dot(g110, vec3(Pf1.xy, Pf0.z));
+	float n001 = dot(g001, vec3(Pf0.xy, Pf1.z));
+	float n101 = dot(g101, vec3(Pf1.x, Pf0.y, Pf1.z));
+	float n011 = dot(g011, vec3(Pf0.x, Pf1.yz));
+	float n111 = dot(g111, Pf1);
+
+	vec3 fade_xyz = fade(Pf0);
+	vec4 n_z = mix(vec4(n000, n100, n010, n110), vec4(n001, n101, n011, n111), fade_xyz.z);
+	vec2 n_yz = mix(n_z.xy, n_z.zw, fade_xyz.y);
+	float n_xyz = mix(n_yz.x, n_yz.y, fade_xyz.x);
+	return 2.2 * n_xyz;
+}
+
 //data structures
 struct Camera{
 	vec3 pos,rotv;
@@ -73,7 +161,9 @@ float msample = sqrt(float(SAMPLE_NUM));
 float s;//seed for random generator
 
 //temporal vars should be uniforms
-const WaterPlane water = WaterPlane(vec3(0,0,-1), 20.0, 2);
+const float sqLen = 10.;
+const WaterPlane water = WaterPlane(vec3(0,1,0), -8.0, 1);
+
 const Light light1 = Light(vec3(-10, 9, -1), vec3(0, 2, 1), false, LIGHT_AREA, vec3(1.), vec3(1.));
 const Box room = Box(vec3(-10, -10, -20), vec3(10, 10, 20), 1);
 const int SPHERE_NUM = 5;
@@ -135,32 +225,31 @@ bool intersectWaterPlane(WaterPlane plane, Ray eyeRay, out float dist){
 	// H(P) = n·P + D = 0
 	// n·(Ro + t * Rd) + D = 0
 	// t = -(D + n·Ro) / n·Rd
-	if (dot(plane.norm, eyeRay.dir) == .0)
+	if (dot(plane.norm, eyeRay.dir) > -0.00000001)
 		return false;
+
 	vec3 n = normalize(plane.norm);
-	float tmp = -(plane.D + dot(n, eyeRay.origin)) / dot(n, eyeRay.dir);
+	float t = -(plane.D + dot(n, eyeRay.origin)) / dot(n, eyeRay.dir);
+	dist = length(eyeRay.dir * t);
+	vec3 position = eyeRay.dir * t + eyeRay.origin;
 
-	// Check if it is in square
-	float z = water.D / water.norm.z;
-	vec3 t1 = vec3(-10, -10.0, z) - eyeRay.origin;
-	vec3 t2 = vec3(10, -10.0, z) - eyeRay.origin;
-	vec3 t3 = vec3(10, 10.0, z) - eyeRay.origin;
-	vec3 t4 = vec3(-10, 10.0, z) - eyeRay.origin;
-
-	n = cross(t2, t1);
-	if (dot(eyeRay.dir, n) < .0) return false;
-
-	n = cross(t1, t4);
-	if (dot(eyeRay.dir, n) < .0) return false;
-
-	n = cross(t4, t3);
-	if (dot(eyeRay.dir, n) < .0) return false;
-
-	n = cross(t3, t2);
-	if (dot(eyeRay.dir, n) < .0) return false;
-
-	dist = tmp;
+	dist += 5.0 * pnoise( 0.05 * position + vec3( 2.0 * globTime ), vec3( 100.0 ) );
 	return true;
+}
+
+// Map the hit position to texture coord
+vec2 texCordWater(vec3 pos){
+	vec2 uv;
+	uv = 0.5 * vec2((pos.x + sqLen) / sqLen, (pos.z + sqLen) / sqLen);
+	return uv;
+}
+
+// Get the water norm from the two normal texture
+vec3 getWaterNorm(vec3 pos){
+	vec2 uv = texCordWater(pos);
+	vec2 uv0 = vec2(mod(uv.x + 0.7 * globTime, 1.0), mod(uv.y + 0.3 * globTime, 1.0));
+	vec2 uv1 = vec2(mod(uv.x + 0.5 * globTime, 1.0), mod(uv.y - 0.6 * globTime, 1.0));
+	return (texture2D(waterNorm0, uv0) + texture2D(waterNorm1, uv1)).xyz;
 }
 
 bool intersectSphere(Sphere sphere, Ray eyeRay, out float dist) {
@@ -173,21 +262,6 @@ bool intersectSphere(Sphere sphere, Ray eyeRay, out float dist) {
 	return false;
 	dist = b- sqrt(sphere.rad * sphere.rad- d);
 	return true;
-}
-
-// Map the hit position to texture coord
-vec2 texCordWater(vec3 pos){
-	vec2 uv;
-	uv = vec2((pos.x + 10.) / 10., (pos.y + 10.) / 10.0);
-	return uv;
-}
-
-// Get the water norm from the two normal texture
-vec3 getWaterNorm(vec3 pos){
-	vec2 uv = texCordWater(pos);
-	vec2 uv0 = vec2(mod(uv.x + 0.7 * globTime, 1.0), mod(uv.y + 0.3 * globTime, 1.0));
-	vec2 uv1 = vec2(mod(uv.x + 0.5 * globTime, 1.0), mod(uv.y - 0.6 * globTime, 1.0));
-	return (texture2D(waterNorm0, uv0) + texture2D(waterNorm1, uv1)).xyz;
 }
 
 bool hitSomething(Ray eyeRay, out Hit hit, bool once){
@@ -288,7 +362,7 @@ int dummySetMtl0(Hit hit){//set material for bounding box
 	return 2;
 }
 void dummyLoadData(){
-	sphere[0] = Sphere(vec3(0, 0, 0), 1.,0);
+	sphere[0] = Sphere(vec3(0, 0, -15), 1.,0);
 	sphere[1] = Sphere(vec3(1, 1, 1), 1.,0);
 	sphere[2] = Sphere(vec3(3, -2, -2), 1.,0);
 	sphere[3] = Sphere(vec3(-5, 0, -2), 1.,0);
@@ -319,8 +393,7 @@ vec3 intersect(Ray eyeRay){//main ray bounce function
 				hit.pos = eyeRay.origin + mDist * eyeRay.dir;
 				hit.norm = getWaterNorm(hit.pos);
 				hit.mt = water.mt;
-				// ncolor = getWaterNorm(hit.pos).xyz;
-				ncolor = hit.pos;
+				ncolor = lightAt(hit, -hit.norm, eyeRay.dir);//calculate color
 			}
 
 			stop = true;
@@ -333,8 +406,6 @@ vec3 intersect(Ray eyeRay){//main ray bounce function
 	}
 	return color;
 }
-
-
 
 void main(void) {
 	vec3 color = vec3(0) , pColor;//color for current frame and previous frame
@@ -350,6 +421,7 @@ void main(void) {
 
 	color = intersect(eyeRay);//calculate current frame pixel color
 	pColor = texture2D(pTex, gl_FragCoord.xy/camera.res).rgb;//pixel color from pevious frame
-	gl_FragColor = vec4(mix(pColor,color,1./sampleCount), 1);//mix 2 color to achieve Antialiasing
+	gl_FragColor = vec4(color, 1.);
+	// gl_FragColor = vec4(mix(pColor,color,1./sampleCount), 1);//mix 2 color to achieve Antialiasing
 	//gl_FragColor = vec4(texture2D(mtlTex, vec2(1. / 3., 3. /mtlNum)).rgb, 1);
 }
