@@ -39,9 +39,11 @@ var Render = {
 		program.camPosLoc = gl.getUniformLocation(program, "camera.pos");
 		program.camTransLoc = gl.getUniformLocation(this.program, "trans");
 		program.sampleCountLoc = gl.getUniformLocation(program, "sampleCount");
-		program.tex1Loc = gl.getUniformLocation(program, "tex1");
-		program.tex0Loc = gl.getUniformLocation(program, "tex0");
+		program.tex1Loc = gl.getUniformLocation(program, "tex1");//image texture
+		program.tex0Loc = gl.getUniformLocation(program, "tex0");//pevious result
+		program.tex2Loc = gl.getUniformLocation(program, "tex2");//material as texture
 		program.timeLoc = gl.getUniformLocation(program, "globTime");
+		program.mtlNumLoc = gl.getUniformLocation(program, "mtlNum");
 	},
 	getShaderProgram : function(vs_url, fs_url){
 		var vertexShader = this.getShader(vs_url, gl.VERTEX_SHADER);
@@ -100,6 +102,22 @@ var Render = {
  	 	gl.texParameteri( gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST );
  	 	gl.texImage2D( gl.TEXTURE_2D, 0, gl.RGB, Camera.res[0], Camera.res[1], 0, gl.RGB, gl.UNSIGNED_BYTE, null );
  	 	gl.bindTexture( gl.TEXTURE_2D, null );
+ 	 	return tex;
+ 	 },
+ 	 makeTextureFloat : function(data){
+ 	 	var tex = gl.createTexture();
+ 	 	var w = 4, h = data.length / w / 3; // 3 float for ks, 3 for kd 3 for (ilum, ns, 0);
+ 	 	var dataf = new Float32Array(data);
+ 	 	gl.bindTexture( gl.TEXTURE_2D, tex);
+ 	 	console.log("float texture support: " + gl.getExtension("OES_texture_float"));
+		console.log("linear texture support: " + gl.getExtension("OES_texture_float_linear")); 	 	
+		gl.texParameteri( gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST );
+		gl.texParameteri( gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST );
+ 	 	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); //Prevents s-coordinate wrapping (repeating).
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE); //Prevents t-coordinate wrapping (repeating).
+ 	 	gl.texImage2D( gl.TEXTURE_2D, 0, gl.RGB, w, h, 0, gl.RGB, gl.FLOAT, dataf);
+ 	 	gl.bindTexture(gl.TEXTURE_2D, null);
+ 	 	this.mtlNum = h - 1;
  	 	return tex;
  	 },
  	 getTexture : function(src){ //return an image

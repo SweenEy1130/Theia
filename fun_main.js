@@ -28,13 +28,17 @@ function init(){
 	//set Camera
 	Camera.res = [canvas.width,canvas.height];
 	Camera.getRTrans();
+	//load Shader
 	var traceProg = Render.getShaderProgram("shaders/trace_vs.glsl","shaders/trace_fs.glsl");
 	gl.useProgram(traceProg);
 	Render.program = traceProg;
 	Render.setUniforms(traceProg);
 	var drawProg = Render.getShaderProgram("shaders/draw_vs.glsl","shaders/draw_fs.glsl");
 	Render.drawProg = drawProg;
-
+	//load material
+	var MaterialTextureData = parseMtl("models/sampleMtl.mtl");
+	Render.texMtl = Render.makeTextureFloat(MaterialTextureData);
+	gl.uniform1f(Render.program.mtlNumLoc, Render.mtlNum);//set numbers of material
 	//init buffer, 2 tris for whole canvas
 	var quadBuffer = gl.createBuffer();
 	gl.bindBuffer(gl.ARRAY_BUFFER, quadBuffer);

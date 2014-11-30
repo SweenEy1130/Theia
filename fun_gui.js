@@ -51,7 +51,9 @@ var Gui = {
 		}
 
 	},
-	animate : function(time) {
+
+	renderToBuffer : function()
+	{
 
 		if (Render.texImage.tex) {
 			gl.useProgram(Render.program);//draw to frame buffer
@@ -61,28 +63,41 @@ var Gui = {
 		}
 		Camera.getRTrans();//update translate mat
 		Gui.sampleCount++;
-		//draw to frame buffer
 		gl.useProgram(Render.program);
 		Render.updateShaderParams(Render.program);
-		gl.activeTexture(gl.TEXTURE0);//previous render result
+		//material as texture
+		gl.activeTexture(gl.TEXTURE2);
+		gl.bindTexture(gl.TEXTURE_2D, Render.texMtl);
+		gl.uniform1i(Render.program.tex2Loc, 2);
+		//previous render result
+		gl.activeTexture(gl.TEXTURE0);
 		gl.bindTexture(gl.TEXTURE_2D,Render.tex[0]);
 		gl.uniform1i(Render.program.tex0Loc, 0);
+		//render to texture
 		gl.bindFramebuffer(gl.FRAMEBUFFER, Render.fb);
 		gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, Render.tex[1], 0);
 		gl.enableVertexAttribArray(Render.program);		
 		gl.vertexAttribPointer(Render.program.cVertex, 2, gl.FLOAT, false, 0, 0);
 		gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 		gl.disableVertexAttribArray(Render.program);
-		//draw to screen
+		gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+		//gl.bindTexture(gl.TEXTURE_2D, null);
+		Render.tex.reverse();//swap 2 element
+	},
+	drawToScreen : function()
+	{
 		gl.useProgram(Render.drawProg);
+		gl.bindTexture(gl.TEXTURE_2D, Render.tex[1]);
 		gl.enableVertexAttribArray(Render.drawProg);
 		gl.vertexAttribPointer(Render.drawProg.cVertex, 2, gl.FLOAT, false, 0, 0);	
-		gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 		gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 		gl.disableVertexAttribArray(Render.program);
-		//flip texture
-		Render.tex.reverse();//swap 2 element
-		//gl.flush();
+		gl.bindTexture(gl.TEXTURE_2D, null);	
+	},
+	animate : function(time) {
+		Gui.renderToBuffer();
+		Gui.drawToScreen();
+		gl.flush();
 		window.requestAnimationFrame(Gui.animate);
 		
   }
