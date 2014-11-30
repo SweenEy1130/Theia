@@ -3,7 +3,7 @@ var Gui = {
 	drag : false,
 	offset : [0, 0], //newPos - oldPos
 	time : -1,
-	sampleCount: 0,
+	sampleCount: 0,//when there is no motion, samplecount increase with frames rendered to achieve antialiasing.
 	timeStart : 0,
 	
 	mouseDown :function (e) {
@@ -40,7 +40,7 @@ var Gui = {
 		{
 			case 38://UP
 			case 87:
-				Camera.pos[2] += Camera.rotate[1] < 90 && Camera.rotate[1] > -90 ? 0.1 : -0.1;
+				Camera.pos[2] += Camera.rotate[1] < 90 && Camera.rotate[1] > -90 ? 0.1 : -0.1; //if turn a round up and down flip
 				Gui.sampleCount = 0;
 				break;
 			case 40://DOWN
@@ -55,7 +55,7 @@ var Gui = {
 	renderToBuffer : function()
 	{
 		gl.useProgram(Render.program);
-		if (Render.texImage[0].tex) {
+		if (Render.texImage[0].tex) {//to see if a image texture is loaded from file
 			gl.activeTexture(gl.TEXTURE2);//wall texture available
 			gl.uniform1i(Render.program.wallTexLoc, 2);
 			gl.bindTexture(gl.TEXTURE_2D,Render.texImage[0].tex);
@@ -65,14 +65,14 @@ var Gui = {
 			gl.uniform1i(Render.program.wallNormLoc, 3);
 			gl.bindTexture(gl.TEXTURE_2D,Render.texImage[1].tex);
 		}		
-		Camera.getRTrans();//update translate mat
-		Gui.sampleCount++;
+		Camera.getRTrans();//update translate matrix
+		Gui.sampleCount++;//when there is no motion, samplecount increase with frames rendered to achieve antialiasing.
 		Render.updateShaderParams(Render.program);
-		//material as texture
+		//material as texture for achieve ka, kd, ks for different object
 		gl.activeTexture(gl.TEXTURE1);
 		gl.bindTexture(gl.TEXTURE_2D, Render.texMtl);
 		gl.uniform1i(Render.program.mtlTexLoc, 1);
-		//previous render result
+		//bind previous render result to texture for antialiasing
 		gl.activeTexture(gl.TEXTURE0);
 		gl.bindTexture(gl.TEXTURE_2D,Render.tex[0]);
 		gl.uniform1i(Render.program.pTexLoc, 0);

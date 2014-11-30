@@ -33,7 +33,7 @@ var Render = {
 	programs : [],
 	texture : null,
 
-	setUniforms: function(program){
+	setUniforms: function(program){//set uniform location in shader programs
 		program.camFovLoc = gl.getUniformLocation(program, "camera.fov_factor");
 		program.camResLoc = gl.getUniformLocation(program, "camera.res");
 		program.camPosLoc = gl.getUniformLocation(program, "camera.pos");
@@ -46,7 +46,7 @@ var Render = {
 		program.timeLoc = gl.getUniformLocation(program, "globTime");
 		program.mtlNumLoc = gl.getUniformLocation(program, "mtlNum");
 	},
-	getShaderProgram : function(vs_url, fs_url){
+	getShaderProgram : function(vs_url, fs_url){//getShader program using vertex shader file and fragment shader file
 		var vertexShader = this.getShader(vs_url, gl.VERTEX_SHADER);
 		var fragmentShader = this.getShader(fs_url, gl.FRAGMENT_SHADER);
 		
@@ -61,8 +61,8 @@ var Render = {
 		return program;
 	},
  	 getShader : function(url, type){
- 	 	var ss;//shaderScript and shader
- 	 	$.ajax({
+ 	 	var ss;//shaderScript
+ 	 	$.ajax({//load file to string
  	 		dataType: "text",
  	 		url: url,
  	 		async: false,//synchronically load file
@@ -86,12 +86,12 @@ var Render = {
  	 	    
  	 },
  	  updateShaderParams : function(program){
- 	  	gl.uniform1f(program.sampleCountLoc, Gui.sampleCount);
- 	  	gl.uniform1f(program.timeLoc, (Date.now()-Gui.timeStart)/1000.);
- 	 	gl.uniform1f(program.camFovLoc, Math.tan(Uti.radians(Camera.fov/2)));
- 	 	gl.uniform2fv(program.camResLoc, Camera.res);
- 	 	gl.uniform3fv(program.camPosLoc, Camera.pos);
- 	 	gl.uniformMatrix3fv(program.camTransLoc, false, Uti.flat(Camera.rtrans));
+ 	  	gl.uniform1f(program.sampleCountLoc, Gui.sampleCount);//number of samples achieved for antialiasing
+ 	  	gl.uniform1f(program.timeLoc, (Date.now()-Gui.timeStart)/1000.);//time since start, seconds
+ 	 	gl.uniform1f(program.camFovLoc, Math.tan(Uti.radians(Camera.fov/2)));//camera field of view
+ 	 	gl.uniform2fv(program.camResLoc, Camera.res);//screen resolution
+ 	 	gl.uniform3fv(program.camPosLoc, Camera.pos);//camera position
+ 	 	gl.uniformMatrix3fv(program.camTransLoc, false, Uti.flat(Camera.rtrans));//transform matrix for camera to world
  	 	//gl.uniform3fv(gl.getUniformLocation(this.program, "camera.rotv"), Camera.rotv);
  	 },
 
@@ -104,23 +104,24 @@ var Render = {
  	 	gl.bindTexture( gl.TEXTURE_2D, null );
  	 	return tex;
  	 },
- 	 makeTextureFloat : function(data){
+ 	 makeTextureFloat : function(data){//get texture from array, used for materials
  	 	var tex = gl.createTexture();
- 	 	var w = 5, h = data.length / w / 3; // 3 float for ks, 3 for kd 3 for (ilum, ns, 0);
+ 	 	var w = 5; //5 vec3: ka, kd, ks, attr, map
+ 	 	var h = data.length / w / 3; // vec3 takes 3 floats
  	 	var dataf = new Float32Array(data);
  	 	gl.bindTexture( gl.TEXTURE_2D, tex);
- 	 	console.log("float texture support: " + gl.getExtension("OES_texture_float"));
-		console.log("linear texture support: " + gl.getExtension("OES_texture_float_linear")); 	 	
+ 	 	console.log("float texture support: " + gl.getExtension("OES_texture_float"));//inorder to use float texture
+		console.log("linear texture support: " + gl.getExtension("OES_texture_float_linear"));//inorder to use NPOT texture
 		gl.texParameteri( gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST );
 		gl.texParameteri( gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST );
- 	 	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); //Prevents s-coordinate wrapping (repeating).
-		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE); //Prevents t-coordinate wrapping (repeating).
+ 	 	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); //Prevents s-coordinate wrapping.inorder to use NPOT texture
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE); //Prevents t-coordinate wrapping.inorder to use NPOT texture
  	 	gl.texImage2D( gl.TEXTURE_2D, 0, gl.RGB, w, h, 0, gl.RGB, gl.FLOAT, dataf);
  	 	gl.bindTexture(gl.TEXTURE_2D, null);
- 	 	this.mtlNum = h - 1;
+ 	 	this.mtlNum = h - 1;//inorder to map material index to [0, 1];
  	 	return tex;
  	 },
- 	 getTexture : function(src){ //return an image
+ 	 getTexture : function(src){ //get texture from an image
  	 	var texImage = new Image();
  	 	texImage.src = src;
  	 	texImage.onload = function(e) {

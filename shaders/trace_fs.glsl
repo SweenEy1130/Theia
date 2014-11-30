@@ -54,7 +54,7 @@ const int BOUNCE = 3;//max bounce time
 const float EPSILON = 0.001;//tolerance
 const float INFINITY = 10000.;
 const int X = 0, Y = 1, Z = 2;
-const int SAMPLE_NUM = 1;
+const int SAMPLE_NUM = 16;
 float KA = 0., KD = 1./mtlNum, KS = 2./mtlNum, MAP = 3./mtlNum, ATTR = 1.;
 float msample = sqrt(float(SAMPLE_NUM));
 float s;//seed for random generator
@@ -232,20 +232,20 @@ void dummyLoadData(){
 }
 
 vec3 intersect(Ray eyeRay){//main ray bounce function
-	vec3 color = vec3(0),ncolor;
+	vec3 color = vec3(0),ncolor;//accumulated color and ncolor for current object
 	Hit hit;
 	bool stop = false;
 	float dist;
 	
 	for(int i = 0; i < BOUNCE; i++){	
-		if(hitSomething(eyeRay, hit, false)){
-			ncolor = lightAt(hit, hit.norm, eyeRay.dir);
+		if(hitSomething(eyeRay, hit, false)){//hit anything inside box
+			ncolor = lightAt(hit, hit.norm, eyeRay.dir);//calculate color
 		}
 		else{//hit bounding box
-			if(intersectBox(eyeRay, room, dist)){
+			if(intersectBox(eyeRay, room, dist)){//intersect room return the distance between ray origin and hit spot
 				hit.pos = eyeRay.origin + dist * eyeRay.dir;
 				hit.norm = normalForBox(hit.pos, room);
-				hit.mt = dummySetMtl0(hit);
+				hit.mt = dummySetMtl0(hit);//different merterial for different face
 				ncolor = lightAt(hit, -hit.norm, eyeRay.dir);//calculate inner color
 			}
 			stop = true;
@@ -263,20 +263,19 @@ vec3 intersect(Ray eyeRay){//main ray bounce function
 
 
 void main(void) {
-	vec3 color = vec3(0) , pColor;
-	vec2 offset;
-	vec2 seed = gl_FragCoord.xy/camera.res+globTime;
+	vec3 color = vec3(0) , pColor;//color for current frame and previous frame
+	vec2 offset;//random offset to do Antialiasing
+	vec2 seed = gl_FragCoord.xy/camera.res+globTime;//2 dimentional seed
     //init operation
 	srand(seed);//feed random generator
-    dummyLoadData();
+    dummyLoadData();//load sphere position
     //fire random ray
-	offset = randOffset(sampleCount);
+	offset = randOffset(sampleCount);//random offset to do Antialiasing
 	Ray eyeRay = Ray(trans*vec3((gl_FragCoord.xy+offset-camera.res/2.)/camera.res.yy * camera.fov_factor,1),camera.pos);//fire eye ray
 	eyeRay.dir = normalize(eyeRay.dir);
 	
-	color = intersect(eyeRay);
-	pColor = texture2D(pTex, gl_FragCoord.xy/camera.res).rgb;
-	gl_FragColor = vec4(mix(pColor,color,1./sampleCount), 1);
+	color = intersect(eyeRay);//calculate current frame pixel color
+	pColor = texture2D(pTex, gl_FragCoord.xy/camera.res).rgb;//pixel color from pevious frame
+	gl_FragColor = vec4(mix(pColor,color,1./sampleCount), 1);//mix 2 color to achieve Antialiasing
 	//gl_FragColor = vec4(texture2D(mtlTex, vec2(1. / 3., 3. /mtlNum)).rgb, 1);
-
 }
