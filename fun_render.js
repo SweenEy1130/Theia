@@ -5,8 +5,8 @@ var Camera = {
 	offset : [0, 0, 0],//camera position offset
 	rotate : [0, 0, 0],//lookat direction rotate degrees
 	rotv : [0, 0, 0],
-	fov : 65,//field of view, y axis
-	ratio : 1,
+	fov : 90,//field of view, y axis
+	res : [0, 0],
 	rtrans : null,//translate eye ray from camera space to word space
 	getRTrans : function ()
 	{
@@ -19,23 +19,35 @@ var Camera = {
 		u = Uti.normalize(u);
 		r = Uti.normalize(r);
 
-		this.rtrans = [
+		var trans = [
 		[ r[0], u[0], f[0] ],
 		[ r[1], u[1], f[1] ],
 		[ r[2], u[2], f[2] ]
 		];
+
+		var rot = math.multiply(Uti.rotateX(this.rotate[0]), Uti.rotateY(this.rotate[1]));
+		this.rtrans = math.multiply(trans, rot);
 	},
 };
 var Render = {
-	program : null,
+	programs : [],
 	texture : null,
-	getShaderProgram : function(gl){
-		var fragmentShader = this.getShader(gl, "shader-fs", gl.FRAGMENT_SHADER);
-		var vertexShader = this.getShader(gl, "shader-vs", gl.VERTEX_SHADER);
+
+	setUniforms: function(program){
+		program.camFovLoc = gl.getUniformLocation(program, "camera.fov_factor");
+		program.camResLoc = gl.getUniformLocation(program, "camera.res");
+		program.camPosLoc = gl.getUniformLocation(program, "camera.pos");
+		program.camTransLoc = gl.getUniformLocation(this.program, "trans");
+		program.sampleCountLoc = gl.getUniformLocation(program, "sampleCount");
+		program.tex1Loc = gl.getUniformLocation(program, "tex1");
+		program.tex0Loc = gl.getUniformLocation(program, "tex0");
+		program.timeLoc = gl.getUniformLocation(program, "globTime");
+	},
+	getShaderProgram : function(vs_url, fs_url){
+		var vertexShader = this.getShader(vs_url, gl.VERTEX_SHADER);
+		var fragmentShader = this.getShader(fs_url, gl.FRAGMENT_SHADER);
 		
-		this.program = gl.createProgram();
-		program = this.program;//convenient to write
-		
+		var program = gl.createProgram();
 		gl.attachShader(program, vertexShader);
 		gl.attachShader(program, fragmentShader);
 		gl.linkProgram(program);
@@ -45,54 +57,66 @@ var Render = {
 		}
 		return program;
 	},
+ 	 getShader : function(url, type){
+ 	 	var ss;//shaderScript and shader
+ 	 	$.ajax({
+ 	 		dataType: "text",
+ 	 		url: url,
+ 	 		async: false,//synchronically load file
+ 	 		success: function(data){
+ 	 			ss = data;
+ 	 		},
+ 	 		error:function(){
+ 	 			console.log("unable to load glsl");
+ 	 		}
+ 	 	});
 
-	getShader : function(gl, id, type) {
-		var shaderScript, shader;
-		shaderScript = document.getElementById(id);
-
-		if (!shaderScript || (shaderScript.type != "x-shader/x-fragment" && shaderScript.type != "x-shader/x-vertex") ){
-			return null;
-		}
-		shader = gl.createShader(type);
-		gl.shaderSource(shader, shaderScript.text);
-		gl.compileShader(shader);  
-
- 	 	// See if it compiled successfully
- 	 	if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {  
- 	 		alert("An error occurred compiling the shaders: " + gl.getShaderInfoLog(shader));  
+ 	 	var s = gl.createShader(type);
+ 	 	gl.shaderSource(s, ss);
+ 	 	gl.compileShader(s);
+  	 	// See if it compiled successfully
+ 	 	if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {  
+ 	 		alert("Compile Error in " + url+ ":" + gl.getShaderInfoLog(s));  
  	 		return null;  
  	 	}
- 	 	return shader;
+ 	 	return s;		
+ 	 	    
  	 },
 
- 	  updateShaderParams : function(gl){
- 	 	gl.uniform3fv(this.program.cameraPos, Camera.pos);
- 	 	gl.uniform1f(gl.getUniformLocation(this.program, "fov"), Camera.fov);
- 	 	gl.uniform1f(gl.getUniformLocation(this.program, "ratio"), Camera.ratio);
- 	 	gl.uniform3fv(gl.getUniformLocation(this.program, "cameraPos"), Camera.pos);
- 	 	gl.uniformMatrix3fv(gl.getUniformLocation(this.program, "rtrans"), false, Uti.flat(Camera.rtrans));
- 	 	gl.uniform3fv(gl.getUniformLocation(this.program, "rot"), Camera.rotate);
- 	 	gl.uniform3fv(gl.getUniformLocation(this.program, "rotv"), Camera.rotv);
+ 	  updateShaderParams : function(program){
+ 	  	gl.uniform1f(program.sampleCountLoc, Gui.sampleCount);
+ 	  	gl.uniform1f(program.timeLoc, (Date.now()-Gui.timeStart)/1000.);
+ 	 	gl.uniform1f(program.camFovLoc, Math.tan(Uti.radians(Camera.fov/2)));
+ 	 	gl.uniform2fv(program.camResLoc, Camera.res);
+ 	 	gl.uniform3fv(program.camPosLoc, Camera.pos);
+ 	 	gl.uniformMatrix3fv(program.camTransLoc, false, Uti.flat(Camera.rtrans));
+ 	 	//gl.uniform3fv(gl.getUniformLocation(this.program, "camera.rotv"), Camera.rotv);
  	 },
 
- 	 getTexture : function(){
-
- 	 	var image = new Image();
- 	 	image.src = "im_clip.jpg";
- 	 	image.webglTexture = false;
-
- 	 	image.onload=function(e) {
+ 	 makeTexture : function() { //render to texture
+ 	 	var tex = gl.createTexture();
+ 	 	gl.bindTexture( gl.TEXTURE_2D, tex );
+ 	 	gl.texParameteri( gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST );
+ 	 	gl.texParameteri( gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST );
+ 	 	gl.texImage2D( gl.TEXTURE_2D, 0, gl.RGB, Camera.res[0], Camera.res[1], 0, gl.RGB, gl.UNSIGNED_BYTE, null );
+ 	 	gl.bindTexture( gl.TEXTURE_2D, null );
+ 	 	return tex;
+ 	 },
+ 	 getTexture : function(src){ //return an image
+ 	 	var texImage = new Image();
+ 	 	texImage.src = src;
+ 	 	texImage.onload = function(e) {
  	 		var texture=gl.createTexture();
  	 		gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
  	 		gl.bindTexture(gl.TEXTURE_2D, texture);
- 	 		gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+ 	 		gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, this);
  	 		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
  	 		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST_MIPMAP_LINEAR);
  	 		gl.generateMipmap(gl.TEXTURE_2D);
- 	 		gl.bindTexture(gl.TEXTURE_2D, null);
- 	 		image.webglTexture = texture;
+ 	 		gl.bindTexture(gl.TEXTURE_2D, null);//free texture0
+ 	 		this.tex = texture;
  	 	}
- 	 	this.texture = image;
+ 	 	return texImage;
  	 }
 }
 

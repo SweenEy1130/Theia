@@ -1,10 +1,9 @@
 var gl = null;
 window.onload = init;
-
 function init(){
 	var canvas = document.getElementById("canv");
-	canvas.width = 640;
-	canvas.height = 480;
+	canvas.width = 512;
+	canvas.height = 512;
 	canvas.addEventListener("mousemove", Gui.mouseMove, false);
 	canvas.addEventListener("mousedown", Gui.mouseDown, false);
 	canvas.addEventListener("mouseup", Gui.mouseUp, false);
@@ -27,13 +26,14 @@ function init(){
     }
 	
 	//set Camera
-	Camera.ratio = canvas.width / canvas.height;
+	Camera.res = [canvas.width,canvas.height];
 	Camera.getRTrans();
-
-
-	var program = Render.getShaderProgram(gl);
-	gl.useProgram(program);
-	Render.updateShaderParams(gl);
+	var traceProg = Render.getShaderProgram("shaders/trace_vs.glsl","shaders/trace_fs.glsl");
+	gl.useProgram(traceProg);
+	Render.program = traceProg;
+	Render.setUniforms(traceProg);
+	var drawProg = Render.getShaderProgram("shaders/draw_vs.glsl","shaders/draw_fs.glsl");
+	Render.drawProg = drawProg;
 
 	//init buffer, 2 tris for whole canvas
 	var quadBuffer = gl.createBuffer();
@@ -45,7 +45,11 @@ function init(){
         -1.0, -1.0,
     ]), gl.STATIC_DRAW);
 
-    Render.getTexture();
-
+    Render.fb = gl.createFramebuffer();
+    Render.tex = [];
+    Render.tex.push(Render.makeTexture());//render to texture
+    Render.tex.push(Render.makeTexture());
+    Render.texImage = Render.getTexture("im_clip.jpg");
+    Gui.timeStart = Date.now();
     Gui.animate(0);
 }
