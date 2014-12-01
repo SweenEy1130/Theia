@@ -100,7 +100,7 @@ var Render = {
 		//gl.uniform3fv(gl.getUniformLocation(this.program, "camera.rotv"), Camera.rotv);
 	},
 
-	 makeTexture : function() { //render to texture
+	makeTexture : function() { //render to texture
 		var tex = gl.createTexture();
 		gl.bindTexture( gl.TEXTURE_2D, tex );
 		gl.texParameteri( gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST );

@@ -16,7 +16,6 @@ vec4 taylorInvSqrt(vec4 r){
 vec3 fade(vec3 t) {
 	return t*t*t*(t*(t*6.0-15.0)+10.0);
 }
-
 // Classic Perlin noise, periodic variant
 float pnoise(vec3 P, vec3 rep)
 {
@@ -132,8 +131,8 @@ struct Light{
 	vec3 size;//radius for sphere light
 	bool isDirectional;
 	int type;//sphere light or area light
-	vec3 Is;//specular intensity
-	vec3 Id;//diffuse intensity
+	float Is;//specular intensity
+	float Id;//diffuse intensity
 };
 
 uniform Camera camera;
@@ -162,7 +161,7 @@ float s;//seed for random generator
 
 //temporal vars should be uniforms
 const float sqLen = 10.;
-const WaterPlane water = WaterPlane(vec3(0,1,0), -8.0, 1);
+const WaterPlane water = WaterPlane(vec3(0,1,0), -8.0, 4);
 
 const int LIGHT_NUM = 2;
 Light lights[LIGHT_NUM];
@@ -251,9 +250,9 @@ vec2 texCordWater(vec3 pos){
 // Get the water norm from the two normal texture
 vec3 getWaterNorm(vec3 pos){
 	vec2 uv = texCordWater(pos);
-	vec2 uv0 = vec2(mod(uv.x + 0.7 * globTime, 1.0), mod(uv.y + 0.3 * globTime, 1.0));
-	vec2 uv1 = vec2(mod(uv.x + 0.5 * globTime, 1.0), mod(uv.y - 0.6 * globTime, 1.0));
-	return (texture2D(waterNorm0, uv0) + texture2D(waterNorm1, uv1)).xyz;
+	vec2 uv0 = vec2(mod(uv.x + 0.3 * globTime, 1.0), mod(uv.y + 0.1 * globTime, 1.0));
+	vec2 uv1 = vec2(mod(uv.x + 0.2 * globTime, 1.0), mod(uv.y - 0.2 * globTime, 1.0));
+	return normalize((texture2D(waterNorm0, uv0) + texture2D(waterNorm1, uv1)).xyz);
 }
 
 bool intersectSphere(Sphere sphere, Ray eyeRay, out float dist) {
@@ -290,15 +289,14 @@ bool hitSomething(Ray eyeRay, out Hit hit, bool once){
 	return true;
 }
 
-vec3 ambient(vec3 color){
-	return color;
+float ambient(float coe){
+	return coe;
 }
-vec3 diffuse(vec3 L, vec3 N, vec3 Id){
-	return dot(L, N) * Id;
+float diffuse(vec3 L, vec3 N, float Id){
+	return max(dot(L, N), 0.) * Id;
 }
-vec3 specular(vec3 L, vec3 N, vec3 V, vec3 Is, float Ns){
-	vec3 R = reflect(L, N);
-	return pow(min(1.,max(dot(R, V), 0.)), Ns) * Is;
+float specular(vec3 R, vec3 V, float Is, float Ns){
+	return pow(max(dot(R, V), 0.), Ns) * Is;
 }
 
 //simple map test for wall!!!
@@ -343,21 +341,22 @@ vec3 lightAt(Hit hit, vec3 N, vec3 V)//calculate light at a object point
 	}
 
 	// Add ambient light
-	c += ambient(vec3(0.2)) * ka;
+	c += ambient(0.2) * ka;
 
 	Hit sHit;
 	vec3 L, R, offset;
 	Ray shadowRay;
 	for(int i = 0; i < LIGHT_NUM; i++){
+		L = normalize(lights[i].posOrDir - hit.pos);//use point light
+		R = reflect(-L, N);
+		c += diffuse(L, N, lights[i].Id ) * kd;
+		c += specular(R, V, lights[i].Is, ns) *  ks;
+
 		//shadow
 		offset = vec3(randOffset(sampleCount), 0);
 		shadowRay = Ray(normalize(lights[i].posOrDir + offset*lights[i].size - hit.pos), hit.pos);
 		if(hitSomething(shadowRay, sHit, true))
 			return c;
-		L = normalize(lights[i].posOrDir - hit.pos);//use point light
-		R = reflect(L, N);
-		c += diffuse(L, N, lights[i].Id )* kd;
-		c += specular(L, N, V, lights[i].Is, ns)*  ks ;
 	}
 	return c;
 }
@@ -379,9 +378,9 @@ void Initialization(){
 	sphere[3] = Sphere(vec3(-5, 0, -2), 1.,0);
 	sphere[4] = Sphere(vec3(5, -2, -2), 1.,0);
 
-	// Initialize directional lights
-	lights[0] = Light(vec3(-10, 9, -1), vec3(0, 2, 1), false, LIGHT_AREA, vec3(1.), vec3(1.));
-	lights[1] = Light(vec3(10, 10, 10), vec3(1, -2, 0), true, LIGHT_AREA, vec3(1.), vec3(1.));
+	// Initialize lights
+	lights[0] = Light(vec3(-10, 9, -1), vec3(0, 2, 1), false, LIGHT_AREA, 1., 1.);
+	lights[1] = Light(vec3(10, 10, 10), vec3(1, -2, 0), false, LIGHT_AREA, 1., 1.);
 }
 
 vec3 intersect(Ray eyeRay){//main ray bounce function
@@ -409,11 +408,13 @@ vec3 intersect(Ray eyeRay){//main ray bounce function
 				hit.norm = getWaterNorm(hit.pos);
 				hit.mt = water.mt;
 				// Mix color with bounding box
+				// ncolor = lightAt(hit, hit.norm, eyeRay.dir);
 				ncolor = 0.3 * ncolor + 0.7 * lightAt(hit, -hit.norm, eyeRay.dir);
+			}else{
 			}
-
-			stop = true;
+				stop = true;
 		}
+
 		color = i==0 ? ncolor : color * 0.5 +  ncolor * 0.5;
 		//fire new ray
 		eyeRay.origin = hit.pos;
@@ -439,7 +440,7 @@ void main(void) {
 
 	color = intersect(eyeRay);//calculate current frame pixel color
 	pColor = texture2D(pTex, gl_FragCoord.xy/camera.res).rgb;//pixel color from pevious frame
-	gl_FragColor = vec4(color, 1.);
+	// gl_FragColor = vec4(color, 1.);
 	gl_FragColor = vec4(mix(pColor,color,1./sampleCount), 1);//mix 2 color to achieve Antialiasing
 	//gl_FragColor = vec4(texture2D(mtlTex, vec2(1. / 3., 3. /mtlNum)).rgb, 1);
 }
