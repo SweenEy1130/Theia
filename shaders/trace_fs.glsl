@@ -162,8 +162,9 @@ float msample = sqrt(float(SAMPLE_NUM));
 float s;//seed for random generator
 
 //temporal vars should be uniforms
-const float sqLen = 10.;
-const WaterPlane water = WaterPlane(vec3(0,1,0), -8.0, 4);
+// Set water plane area lenght and the ratio of indices of refraction
+float sqLen, eta;
+WaterPlane water;
 
 const int LIGHT_NUM = 2;
 Light lights[LIGHT_NUM];
@@ -223,7 +224,7 @@ vec3 normalForBox(vec3 hit, Box box){
 	return vec3(0.0, 0.0, 1.0);
 }
 
-bool intersectWaterPlane(WaterPlane plane, Ray eyeRay, out float dist){
+bool intersectWaterPlane(Ray eyeRay, WaterPlane plane, out float dist){
 	// ray water intersect
 	// P(t) = Ro + t * Rd
 	// H(P) = n·P + D = 0
@@ -243,6 +244,7 @@ bool intersectWaterPlane(WaterPlane plane, Ray eyeRay, out float dist){
 }
 
 // Map the hit position to texture coord
+// Only works for the Y axis plane
 vec2 texCordWater(vec3 pos){
 	vec2 uv;
 	uv = 0.5 * vec2((pos.x + sqLen) / sqLen, (pos.z + sqLen) / sqLen);
@@ -269,7 +271,7 @@ bool intersectSphere(Sphere sphere, Ray eyeRay, out float dist) {
 	return true;
 }
 
-bool hitSomething(Ray eyeRay, out Hit hit, bool once){
+bool hitSphere(Ray eyeRay, out Hit hit, bool once){
 	float mDist = INFINITY, dist = INFINITY;
 	vec3 objPos;
 	//hit spheres
@@ -377,7 +379,7 @@ vec3 lightAt(Hit hit, vec3 N, vec3 V)//calculate light at a object point
 		//shadow
 		offset = vec3(randOffset(sampleCount), 0);
 		shadowRay = Ray(normalize(lights[i].posOrDir + offset*lights[i].size - hit.pos), hit.pos);
-		if(hitSomething(shadowRay, sHit, true))
+		if(hitSphere(shadowRay, sHit, true))
 			return c;
 	}
 	return c;
@@ -387,9 +389,11 @@ int dummySetMtl0(Hit hit){//set material for bounding box
 	if(abs(hit.norm.x) == 1.0){
 		return 3;
 	}
-
-	if(abs(hit.norm.y) == 1.0){
+	if(hit.norm.y == -1.0){
 		return 5;
+	}
+	if(abs(hit.norm.y) == 1.0){
+		return 1;
 	}
 
 	return 2;
@@ -405,19 +409,29 @@ void Initialization(){
 	// Initialize lights
 	lights[0] = Light(vec3(-10, 9, -1), vec3(0, 2, 1), false, LIGHT_AREA, 1., 1.);
 	lights[1] = Light(vec3(10, 10, 10), vec3(1, -2, 0), false, LIGHT_AREA, 1., 1.);
+
+	// Initialize water plane
+	sqLen = 10.;
+	eta = 0.8;
+	water = WaterPlane(vec3(0,1,0), -8.0, 4);
 }
 
 vec3 intersect(Ray eyeRay){//main ray bounce function
 	vec3 color = vec3(0), ncolor = vec3(0);//accumulated color and ncolor for current object
 	Hit hit;
 	bool stop = false;
-	float dist;
+	float dist, alpha = 1.;
 
 	for(int i = 0; i < BOUNCE; i++){
-		if(hitSomething(eyeRay, hit, false)){//hit anything inside box
+		if(hitSphere(eyeRay, hit, false)){//hit anything inside box
 			ncolor = lightAt(hit, hit.norm, eyeRay.dir);//calculate color
-		}
-		else{//hit bounding box
+			alpha = 0.5;
+			color = i==0 ? ncolor : (color * alpha + ncolor * (1. - alpha));
+			//fire new ray
+			eyeRay.origin = hit.pos;
+			eyeRay.dir = reflect(eyeRay.dir, hit.norm);
+		}else{
+			//hit bounding box
 			if(intersectBox(eyeRay, room, dist)){//intersect room return the distance between ray origin and hit spot
 				hit.pos = eyeRay.origin + dist * eyeRay.dir;
 				hit.norm = normalForBox(hit.pos, room);
@@ -427,22 +441,23 @@ vec3 intersect(Ray eyeRay){//main ray bounce function
 
 			float mDist;
 			// Hit water plane
-			if (intersectWaterPlane(water, eyeRay, mDist) && dist > mDist){
+			if (intersectWaterPlane(eyeRay, water, mDist) && dist > mDist){
 				hit.pos = eyeRay.origin + mDist * eyeRay.dir;
 				hit.norm = getWaterNorm(hit.pos);
 				hit.mt = water.mt;
-				// Mix color with bounding box
-				// ncolor = lightAt(hit, hit.norm, eyeRay.dir);
-				ncolor = 0.3 * ncolor + 0.7 * lightAt(hit, -hit.norm, eyeRay.dir);
+				ncolor = lightAt(hit, -hit.norm, eyeRay.dir);
+
+				eyeRay.origin = hit.pos;
+				eyeRay.dir = refract(eyeRay.dir, hit.norm, eta);
+				color = i==0 ? ncolor : (color * alpha + ncolor * (1. - alpha));
+				alpha = .8;
+				continue;
 			}else{
-			}
+				color = i==0 ? ncolor : (color * alpha + ncolor * (1. - alpha));
 				stop = true;
+			}
 		}
 
-		color = i==0 ? ncolor : color * 0.5 +  ncolor * 0.5;
-		//fire new ray
-		eyeRay.origin = hit.pos;
-		eyeRay.dir = reflect(eyeRay.dir, hit.norm);
 		if(stop) break;
 	}
 	return color;
