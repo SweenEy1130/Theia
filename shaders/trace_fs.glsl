@@ -233,7 +233,8 @@ bool intersectWaterPlane(WaterPlane plane, Ray eyeRay, out float dist){
 	dist = length(eyeRay.dir * t);
 	vec3 position = eyeRay.dir * t + eyeRay.origin;
 
-	dist += 5.0 * pnoise( 0.05 * position + vec3( 2.0 * globTime ), vec3( 100.0 ) );
+	// add displacement to the dist
+	dist += 2.0 * pnoise( 0.05 * position + vec3( 2.0 * globTime ), vec3( 100.0 ) );
 	return true;
 }
 
@@ -370,7 +371,7 @@ void dummyLoadData(){
 }
 
 vec3 intersect(Ray eyeRay){//main ray bounce function
-	vec3 color = vec3(0),ncolor;//accumulated color and ncolor for current object
+	vec3 color = vec3(0), ncolor = vec3(0);//accumulated color and ncolor for current object
 	Hit hit;
 	bool stop = false;
 	float dist;
@@ -393,7 +394,8 @@ vec3 intersect(Ray eyeRay){//main ray bounce function
 				hit.pos = eyeRay.origin + mDist * eyeRay.dir;
 				hit.norm = getWaterNorm(hit.pos);
 				hit.mt = water.mt;
-				ncolor = lightAt(hit, -hit.norm, eyeRay.dir);//calculate color
+				// Mix color with bounding box
+				ncolor = 0.3 * ncolor + 0.7 * lightAt(hit, -hit.norm, eyeRay.dir);
 			}
 
 			stop = true;
@@ -422,6 +424,6 @@ void main(void) {
 	color = intersect(eyeRay);//calculate current frame pixel color
 	pColor = texture2D(pTex, gl_FragCoord.xy/camera.res).rgb;//pixel color from pevious frame
 	gl_FragColor = vec4(color, 1.);
-	// gl_FragColor = vec4(mix(pColor,color,1./sampleCount), 1);//mix 2 color to achieve Antialiasing
+	gl_FragColor = vec4(mix(pColor,color,1./sampleCount), 1);//mix 2 color to achieve Antialiasing
 	//gl_FragColor = vec4(texture2D(mtlTex, vec2(1. / 3., 3. /mtlNum)).rgb, 1);
 }
