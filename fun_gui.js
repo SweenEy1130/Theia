@@ -85,6 +85,13 @@ var Gui = {
 			gl.bindTexture(gl.TEXTURE_2D,Render.waterNorm[1].tex);
 		}
 
+		// Pool texture
+		if (Render.texImage[2].tex) {
+			gl.activeTexture(gl.TEXTURE6);
+			gl.uniform1i(Render.program.poolTexLoc, 6);
+			gl.bindTexture(gl.TEXTURE_2D,Render.texImage[2].tex);
+		}
+
 		Camera.getRTrans();//update translate matrix
 		Gui.sampleCount++;//when there is no motion, samplecount increase with frames rendered to achieve antialiasing.
 		Render.updateShaderParams(Render.program);

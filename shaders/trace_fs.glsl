@@ -147,6 +147,8 @@ uniform sampler2D wallNorm;
 // Water normal map texture
 uniform sampler2D waterNorm0;
 uniform sampler2D waterNorm1;
+// Pool tile texture
+uniform sampler2D poolTex;
 
 uniform highp float globTime;
 //const setting
@@ -299,14 +301,30 @@ float specular(vec3 R, vec3 V, float Is, float Ns){
 	return pow(max(dot(R, V), 0.), Ns) * Is;
 }
 
-//simple map test for wall!!!
-vec2 mapfoo(vec3 pos){
+// Only works for left and right box
+vec2 mapXaxis(vec3 pos){
 	pos.x = 0.0;//no use
 	pos.y /= room.max.y - room.min.y;
 	pos.z /= room.max.z - room.min.z;
 	pos += 0.5;
 	pos.y = 1.0 - pos.y;
 	return pos.yz;
+}
+
+// Only works for top and bottom box
+vec2 mapYaxis(vec3 pos){
+	pos.x /= room.max.x - room.min.x;
+	pos.z /= room.max.z - room.min.z;
+	pos += 0.5;
+	return pos.xz;
+}
+
+// Only works for front and back box
+vec2 mapZaxis(vec3 pos){
+	pos.x /= room.max.x - room.min.x;
+	pos.y /= room.max.z - room.min.y;
+	pos += 0.5;
+	return pos.xy;
 }
 
 vec3 lightAt(Hit hit, vec3 N, vec3 V)//calculate light at a object point
@@ -326,11 +344,11 @@ vec3 lightAt(Hit hit, vec3 N, vec3 V)//calculate light at a object point
 	kd = texture2D(mtlTex, vec2(KD, mtlCoord)).xyz;
 
 	if(map.y > 0.){//enable normal map
-		N = texture2D(wallNorm, mapfoo(hit.pos)).rgb;
+		N = texture2D(wallNorm, mapXaxis(hit.pos)).rgb;
 	}
 	if(map.x > 0.){ // enable texture map
-		ka = kd = texture2D(wallTex, mapfoo(hit.pos)).rgb;
-		//ka = texture2D(tex1, mapfoo(hit.pos)).rgb; //here i just use one texture
+		ka = kd = texture2D(wallTex, mapXaxis(hit.pos)).rgb;
+		//ka = texture2D(tex1, mapXaxis(hit.pos)).rgb; //here i just use one texture
 		//ka = kd = vec3(0);
 	}
 	else if(illum == 0){
@@ -340,6 +358,10 @@ vec3 lightAt(Hit hit, vec3 N, vec3 V)//calculate light at a object point
 		ns = attr.y;
 	}
 
+	if (hit.mt == 5){
+		// enable pool texture
+		ka = kd = texture2D(poolTex, mapYaxis(hit.pos)).rgb;
+	}
 	// Add ambient light
 	c += ambient(0.2) * ka;
 
@@ -365,9 +387,11 @@ int dummySetMtl0(Hit hit){//set material for bounding box
 	if(abs(hit.norm.x) == 1.0){
 		return 3;
 	}
+
 	if(abs(hit.norm.y) == 1.0){
-		return 1;
+		return 5;
 	}
+
 	return 2;
 }
 void Initialization(){

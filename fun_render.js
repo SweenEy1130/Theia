@@ -43,7 +43,8 @@ var Render = {
 		program.mtlTexLoc = gl.getUniformLocation(program, "mtlTex");//material as texture
 		program.wallTexLoc = gl.getUniformLocation(program, "wallTex");//wall texture
 		program.wallNormLoc = gl.getUniformLocation(program, "wallNorm");//wall norm map
-
+		// Pool texture map
+		program.poolTexLoc = gl.getUniformLocation(program, "poolTex");
 		// Water normal map 0 and 1
 		program.waterNorm0Loc = gl.getUniformLocation(program, "waterNorm0");
 		program.waterNorm1Loc = gl.getUniformLocation(program, "waterNorm1");
