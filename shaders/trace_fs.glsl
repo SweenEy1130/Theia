@@ -164,8 +164,11 @@ float s;//seed for random generator
 const float sqLen = 10.;
 const WaterPlane water = WaterPlane(vec3(0,1,0), -8.0, 1);
 
-const Light light1 = Light(vec3(-10, 9, -1), vec3(0, 2, 1), false, LIGHT_AREA, vec3(1.), vec3(1.));
+const int LIGHT_NUM = 2;
+Light lights[LIGHT_NUM];
+
 const Box room = Box(vec3(-10, -10, -20), vec3(10, 10, 20), 1);
+
 const int SPHERE_NUM = 5;
 Sphere sphere[SPHERE_NUM];
 
@@ -189,7 +192,7 @@ float rand(){
 }
 
 vec2 randOffset(float sampleCount){
-    sampleCount = mod(sampleCount,float(SAMPLE_NUM));
+	sampleCount = mod(sampleCount,float(SAMPLE_NUM));
 	vec2 offset = vec2(floor(sampleCount/msample),mod(sampleCount,msample));
 	offset += vec2(rand(), rand());
 	offset /= msample;
@@ -310,13 +313,11 @@ vec2 mapfoo(vec3 pos){
 
 vec3 lightAt(Hit hit, vec3 N, vec3 V)//calculate light at a object point
 {
+	vec3 c = vec3(0);
 	vec3 ka = vec3(0), kd = vec3(0), ks = vec3(0), attr = vec3(0, 1, 0), map = vec3(0);
 	float ns; //specular power
 	int illum = 0;
 	float mtlCoord = float(hit.mt) / mtlNum;//change material index to uv coord
-	vec3 L = normalize(light1.posOrDir - hit.pos);//use point light
-	vec3 R = reflect(L, N);
-	vec3 c = vec3(0);
 	attr = texture2D(mtlTex, vec2(ATTR, mtlCoord)).xyz;//x->illum y->ns z->texture
 	illum = int(attr.x);
 
@@ -340,16 +341,24 @@ vec3 lightAt(Hit hit, vec3 N, vec3 V)//calculate light at a object point
 		ks = texture2D(mtlTex, vec2(KS, mtlCoord)).xyz;
 		ns = attr.y;
 	}
+
+	// Add ambient light
 	c += ambient(vec3(0.2)) * ka;
-    //shadow
-    vec3 offset = vec3(randOffset(sampleCount), 0);
-    float dist = -1.;
-    Ray shadowRay = Ray(normalize(light1.posOrDir+offset*light1.size-hit.pos), hit.pos);
-    Hit sHit;
-    if(hitSomething(shadowRay, sHit, true))
-       return c;
-    c += diffuse(L, N, light1.Id )* kd;
-    c += specular(L, N, V, light1.Is, ns)*  ks ;
+
+	Hit sHit;
+	vec3 L, R, offset;
+	Ray shadowRay;
+	for(int i = 0; i < LIGHT_NUM; i++){
+		//shadow
+		offset = vec3(randOffset(sampleCount), 0);
+		shadowRay = Ray(normalize(lights[i].posOrDir + offset*lights[i].size - hit.pos), hit.pos);
+		if(hitSomething(shadowRay, sHit, true))
+			return c;
+		L = normalize(lights[i].posOrDir - hit.pos);//use point light
+		R = reflect(L, N);
+		c += diffuse(L, N, lights[i].Id )* kd;
+		c += specular(L, N, V, lights[i].Is, ns)*  ks ;
+	}
 	return c;
 }
 
@@ -362,12 +371,17 @@ int dummySetMtl0(Hit hit){//set material for bounding box
 	}
 	return 2;
 }
-void dummyLoadData(){
+void Initialization(){
+	// Initialize spheres
 	sphere[0] = Sphere(vec3(0, 0, -15), 1.,0);
 	sphere[1] = Sphere(vec3(1, 1, 1), 1.,0);
 	sphere[2] = Sphere(vec3(3, -2, -2), 1.,0);
 	sphere[3] = Sphere(vec3(-5, 0, -2), 1.,0);
 	sphere[4] = Sphere(vec3(5, -2, -2), 1.,0);
+
+	// Initialize directional lights
+	lights[0] = Light(vec3(-10, 9, -1), vec3(0, 2, 1), false, LIGHT_AREA, vec3(1.), vec3(1.));
+	lights[1] = Light(vec3(10, 10, 10), vec3(1, -2, 0), true, LIGHT_AREA, vec3(1.), vec3(1.));
 }
 
 vec3 intersect(Ray eyeRay){//main ray bounce function
@@ -413,10 +427,12 @@ void main(void) {
 	vec3 color = vec3(0) , pColor;//color for current frame and previous frame
 	vec2 offset;//random offset to do Antialiasing
 	vec2 seed = gl_FragCoord.xy/camera.res+globTime;//2 dimentional seed
-    //init operation
+	//init operation
 	srand(seed);//feed random generator
-    dummyLoadData();//load sphere position
-    //fire random ray
+
+	// Initialize spheres, lights and other objects
+	Initialization();
+	//fire random ray
 	offset = randOffset(sampleCount);//random offset to do Antialiasing
 	Ray eyeRay = Ray(trans*vec3((gl_FragCoord.xy+offset-camera.res/2.)/camera.res.yy * camera.fov_factor,1),camera.pos);//fire eye ray
 	eyeRay.dir = normalize(eyeRay.dir);
