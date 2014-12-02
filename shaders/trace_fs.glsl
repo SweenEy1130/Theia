@@ -134,7 +134,7 @@ const float PI = 3.1415;
 float KA = 0., KD = 1./mtlNum, KS = 2./mtlNum, MAP = 3./mtlNum, ATTR = 1.;
 float msample = sqrt(float(SAMPLE_NUM));
 vec3 randVec = vec3(0);
-float randSeed = 0.;
+int  bounceTime  = 0;
 bool hitWater = false;
 //temporal vars should be uniforms
 // Set water plane area lenght and the ratio of indices of refraction
@@ -249,18 +249,21 @@ bool hitSomething(in Ray eyeRay, out Hit hit, bool once){
 		hit.pos = eyeRay.origin + mDist * eyeRay.dir;
 		hit.norm = normalize(hit.pos - objPos);
 	}
-	if(hitWater == true){ //avoid downside bring by displacement
+	if(once)//water wont block light
+	return false;
+/*	if(hitWater == true){ //avoid downside bring by displacement
 		hitWater = false;
 		return false;
-	}
+	}*/
 
 	if(intersectWaterPlane(eyeRay, water, dist) && dist < mDist &&dist > 1.){
-		hitWater = true;
 		mDist = dist;
 		hit.pos = eyeRay.origin + dist * eyeRay.dir;
 		//room as bounding box
 		if(hit.pos.x < room.min.x ||  hit.pos.z < room.min.z || hit.pos.x > room.max.x || hit.pos.z > room.max.z)
 			return false;
+		if(bounceTime == 0)
+			hitWater = true;
 		hit.norm =  getWaterNorm(hit.pos);
 		hit.mt = water.mt;
 	}
@@ -344,22 +347,22 @@ vec3 lightAt(in Hit hit, in vec3 N, inout Ray eyeRay)//calculate light at a obje
 		}
 	}
 	else{
-		eyeRay.dir = newDiffuseRay(globTime + randSeed++,N);
+		eyeRay.dir = newDiffuseRay(globTime + float(bounceTime),N);
 	}
 	eyeRay.dir = normalize(eyeRay.dir);
 	//diffuse material without specular light
-	alpha = illum == 0 ? 1. / PI : 1.;
+	//alpha = illum == 0 ? 1. / PI : 1.;
 	// Under water
-/*	if (y < - water.D / water.norm.y + deltah){
+/*	if (hit.pos.y < - water.D / water.norm.y + deltah){
 		ka = .2 * ka + .8 * texture2D(mtlTex, vec2(KA, 4. / mtlNum)).xyz;
 		kd = .2 * kd + .2 * texture2D(mtlTex, vec2(KD, 4. / mtlNum)).xyz;
 		ks = .4 * ks + .2 * texture2D(mtlTex, vec2(KS, 4. / mtlNum)).xyz;
 	}*/
 	// Add ambient light
-	c += ambient(0.2) * ka;
+	c += ambient(0.2) * ka * attr.z;
 	Hit sHit;
 	vec3 L, R, offset;
-	vec3 V = normalize(eyeRay.origin - hit.pos);
+	vec3 V = - normalize(eyeRay.origin - hit.pos);
 	float attenuation = 1.;
 	Ray shadowRay;
 	//set origin 
@@ -367,7 +370,7 @@ vec3 lightAt(in Hit hit, in vec3 N, inout Ray eyeRay)//calculate light at a obje
 
 	for(int i = 0; i < LIGHT_NUM; i++){
 		L = lights[i].isDirectional ? -lights[i].posOrDir : lights[i].posOrDir - hit.pos;
-		attenuation = lights[i].isDirectional ? 1. : 1. / length(L);
+		//attenuation = lights[i].isDirectional ? 1. : 1. / length(L);
 		L = normalize(L);
 		R = reflect(L, N);
 		//shadow
@@ -402,7 +405,7 @@ void Initialization(){
 
 	// Initialize lights
 	lights[0] = Light(vec3(-10, 9, -1), 0.5 /*size*/, true, LIGHT_AREA, 1., 1.);
-	lights[1] = Light(vec3(10, 10, 10), 0.5 /*size*/, false, LIGHT_AREA, 1., 1.);
+	lights[0] = Light(vec3(-10, 10, 10), 0.5 /*size*/, false, LIGHT_AREA, 1., 1.);
 
 	// Initialize water plane
 	sqLen = 10.;
@@ -417,6 +420,7 @@ vec3 intersect(Ray eyeRay){//main ray bounce function
 	float mDist = INFINITY, dist, alpha = 1.;
 	Ray newRay;
 	for(int i = 0; i < BOUNCE; i++){
+		bounceTime = i;
 		mDist = INFINITY;
 		// Hit water plane
 		// hit spheres
@@ -431,8 +435,9 @@ vec3 intersect(Ray eyeRay){//main ray bounce function
 			hit.norm = - normalForBox(hit.pos, room);
 			hit.mt = dummySetMtl0(hit);//different merterial for different face
 		}
-		ncolor = lightAt(hit, hit.norm, eyeRay);//calculate inner color
 		alpha *= .75;
+		ncolor = lightAt(hit, hit.norm, eyeRay);//calculate inner color
+		
 		color += ncolor * alpha;
 		
 	}
@@ -450,9 +455,9 @@ void main(void) {
 
 	color = intersect(eyeRay);//calculate current frame pixel color
 	pColor = texture2D(pTex, gl_FragCoord.xy/camera.res).rgb;//pixel color from pevious frame
-/*	if(sampleCount > float(1))
-		gl_FragColor = vec4(mix(pColor,color,1./float(2)), 1);
-	else*/
+	if(hitWater)
+		gl_FragColor = vec4(mix(pColor,color,1./2.), 1);
+	else
 		gl_FragColor = vec4(mix(pColor,color,1./sampleCount), 1);//mix 2 color to achieve Antialiasing
 	//gl_FragColor = vec4(texture2D(mtlTex, vec2(1. / 3., 3. /mtlNum)).rgb, 1);
 }

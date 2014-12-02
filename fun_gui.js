@@ -93,7 +93,7 @@ var Gui = {
 		}
 
 		Camera.getRTrans();//update translate matrix
-		Gui.sampleCount > 3 ? 0: Gui.sampleCount++;//when there is no motion, samplecount increase with frames rendered to achieve antialiasing.
+		Gui.sampleCount > 16 ? 0: Gui.sampleCount++;//when there is no motion, samplecount increase with frames rendered to achieve antialiasing.
 
 		Render.updateShaderParams(Render.program);
 		//material as texture for achieve ka, kd, ks for different object
