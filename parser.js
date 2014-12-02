@@ -37,7 +37,7 @@ function parseMtl(url){
 		MaterialTextureData.push(L[W].Kd[0], L[W].Kd[1], L[W].Kd[2]);
 		MaterialTextureData.push(L[W].Ks[0], L[W].Ks[1], L[W].Ks[2]);
         MaterialTextureData.push(L[W].map[0], L[W].map[1], L[W].map[2]);
-		MaterialTextureData.push(L[W].illum, L[W].Ns, 0);
+		MaterialTextureData.push(L[W].illum, L[W].Ns, L[W].d);
 
 	}
 	return MaterialTextureData;
@@ -52,6 +52,7 @@ function ObjMaterial(e) {
     this.illum = 0;
     this.Ns = 0;
     this.map = 0;
+    this.d = 1;
 
     for (var d = 0; d < j.length; d++) {
         if (/^\s*newmtl\s/.test(j[d])) {
@@ -70,9 +71,9 @@ function ObjMaterial(e) {
                     var c = j[d].replace(/^\s*/, "").replace(/\s+/g, " ").split(" ");
                     this.Ks = new Float32Array([c[1], c[2], c[3]]);
                 } else {
-                    if (/^\s*Ni\s/.test(j[d])) {
+                    if (/^\s*d\s/.test(j[d])) {
                         var b = j[d].replace(/^\s*/, "").replace(/\s+/g, " ").split(" ");
-                        this.Ni = parseFloat(b[1]);
+                        this.d = parseFloat(b[1]);
                     } else {
                         if (/^\s*Ns\s/.test(j[d])) {
                             var g = j[d].replace(/^\s*/, "").replace(/\s+/g, " ").split(" ");

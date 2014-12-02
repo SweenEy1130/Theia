@@ -9,6 +9,10 @@ function init(){
 	canvas.addEventListener("mouseup", Gui.mouseUp, false);
 	canvas.addEventListener("mouseout", Gui.mouseUp, false);
 	document.addEventListener("keydown", Gui.keyDown, false);
+	window.onbeforeunload = function(){
+		gl.deleteProgram(Render.program);
+		gl.deleteProgram(Render.drawProg);
+	}
 
 	//get gl object
 	try{
