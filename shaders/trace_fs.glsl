@@ -307,14 +307,15 @@ vec3 lightAt(Hit hit, vec3 N, vec3 V)//calculate light at a object point
 			L = normalize(lights[i].posOrDir - hit.pos);//use point light
 		}
 		R = reflect(L, N);
-		c += diffuse(L, N, lights[i].Id ) * kd;
-		c += specular(R, V, lights[i].Is, ns) *  ks;
 
 		//shadow
 		offset = vec3(randOffset(sampleCount), 0);
 		shadowRay = Ray(normalize(lights[i].posOrDir + offset*lights[i].size - hit.pos), hit.pos);
 		if(hitSphere(shadowRay, sHit, true))
 			return c;
+
+		c += diffuse(L, N, lights[i].Id ) * kd;
+		c += specular(R, V, lights[i].Is, ns) *  ks;
 	}
 	return c;
 }
