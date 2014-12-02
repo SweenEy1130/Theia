@@ -111,7 +111,7 @@ float s;//seed for random generator
 
 //temporal vars should be uniforms
 // Set water plane area lenght and the ratio of indices of refraction
-float sqLen, eta;
+float sqLen, eta, deltah;
 WaterPlane water;
 
 const int LIGHT_NUM = 2;
@@ -185,7 +185,9 @@ bool intersectWaterPlane(Ray eyeRay, WaterPlane plane, out float dist){
 	if (dist < 0.) return false;
 	// add displacement to the dist
 	vec3 position = eyeRay.dir * dist + eyeRay.origin;
-	dist += 2.0 * noise( 0.05 * position + 2.0 * globTime);
+	deltah = 2.0 * noise( 0.05 * position + 2.0 * globTime);
+	dist += deltah;
+	deltah = eyeRay.dir.y * deltah;
 	return true;
 }
 
@@ -312,8 +314,10 @@ vec3 lightAt(Hit hit, vec3 N, vec3 V)//calculate light at a object point
 	}
 
 	// Under water
-	if (hit.underWater){
-		ka = 0.2 * ka + 1. * texture2D(mtlTex, vec2(KA, 4. / mtlNum)).xyz;
+	if (hit.pos.y < - water.D / water.norm.y + deltah){
+		ka = .2 * ka + .8 * texture2D(mtlTex, vec2(KA, 4. / mtlNum)).xyz;
+		kd = .2 * kd + .2 * texture2D(mtlTex, vec2(KD, 4. / mtlNum)).xyz;
+		ks = .4 * ks + .2 * texture2D(mtlTex, vec2(KS, 4. / mtlNum)).xyz;
 	}
 	// Add ambient light
 	c += ambient(0.2) * ka;
@@ -356,7 +360,7 @@ void Initialization(){
 	// Initialize spheres
 	sphere[0] = Sphere(vec3(0, 0, -15), 1.,0);
 	sphere[1] = Sphere(vec3(1, 1, 1), 1.,0);
-	sphere[2] = Sphere(vec3(3, -9, -5), 1.,0);
+	sphere[2] = Sphere(vec3(3, -9, -5), 2.,0);
 	sphere[3] = Sphere(vec3(-5, 0, -2), 1.,0);
 	sphere[4] = Sphere(vec3(5, -2, -2), 1.,0);
 
@@ -367,7 +371,8 @@ void Initialization(){
 	// Initialize water plane
 	sqLen = 10.;
 	eta = 0.8;
-	water = WaterPlane(vec3(0,1,0), 3.0, 4);
+	deltah = 0.;
+	water = WaterPlane(vec3(0,1,0), 8.0, 4);
 }
 
 vec3 intersect(Ray eyeRay){//main ray bounce function
@@ -385,7 +390,7 @@ vec3 intersect(Ray eyeRay){//main ray bounce function
 			hit.mt = water.mt;
 
 			ncolor = lightAt(hit, -hit.norm, eyeRay.dir);
-			newAlpha = .7;
+			newAlpha = .2;
 			tcolor = (color * alpha + ncolor * (1. - alpha));
 			// tcolor = hit.norm;
 			newRay.origin = hit.pos;
