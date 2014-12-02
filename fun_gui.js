@@ -43,7 +43,7 @@ var Gui = {
 				Gui.sampleCount = 0;
 				break;
 			case 38://UP
-				Camera.pos[2] += Camera.rotate[1] < 90 && Camera.rotate[1] > -90 ? 0.1 : -0.1; //if turn a round up and down flip
+				Camera.pos[1] += Camera.rotate[1] < 90 && Camera.rotate[1] > -90 ? 0.1 : -0.1; //if turn a round up and down flip
 				Gui.sampleCount = 0;
 				break;
 			case 39:
@@ -51,7 +51,7 @@ var Gui = {
 				Gui.sampleCount = 0;
 				break;
 			case 40://DOWN
-				Camera.pos[2] += Camera.rotate[1] < 90 && Camera.rotate[1] > -90 > 0 ? -0.1 : 0.1 ;
+				Camera.pos[1] += Camera.rotate[1] < 90 && Camera.rotate[1] > -90 > 0 ? -0.1 : 0.1 ;
 				Gui.sampleCount = 0;
 				break;
 		}

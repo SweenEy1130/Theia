@@ -230,15 +230,12 @@ bool intersectWaterPlane(Ray eyeRay, WaterPlane plane, out float dist){
 	// H(P) = n·P + D = 0
 	// n·(Ro + t * Rd) + D = 0
 	// t = -(D + n·Ro) / n·Rd
-	if (dot(plane.norm, eyeRay.dir) > -0.00000001)
-		return false;
-
 	vec3 n = normalize(plane.norm);
-	float t = -(plane.D + dot(n, eyeRay.origin)) / dot(n, eyeRay.dir);
-	dist = length(eyeRay.dir * t);
-	vec3 position = eyeRay.dir * t + eyeRay.origin;
+	dist = -(plane.D + dot(n, eyeRay.origin)) / dot(n, eyeRay.dir);
+	if (dist < 0.) return false;
 
 	// add displacement to the dist
+	vec3 position = eyeRay.dir * dist + eyeRay.origin;
 	dist += 2.0 * pnoise( 0.05 * position + vec3( 2.0 * globTime ), vec3( 100.0 ) );
 	return true;
 }
@@ -371,8 +368,12 @@ vec3 lightAt(Hit hit, vec3 N, vec3 V)//calculate light at a object point
 	vec3 L, R, offset;
 	Ray shadowRay;
 	for(int i = 0; i < LIGHT_NUM; i++){
-		L = normalize(lights[i].posOrDir - hit.pos);//use point light
-		R = reflect(-L, N);
+		if (lights[i].isDirectional){
+			L = normalize(-lights[i].posOrDir);
+		}else{
+			L = normalize(lights[i].posOrDir - hit.pos);//use point light
+		}
+		R = reflect(L, N);
 		c += diffuse(L, N, lights[i].Id ) * kd;
 		c += specular(R, V, lights[i].Is, ns) *  ks;
 
@@ -393,7 +394,7 @@ int dummySetMtl0(Hit hit){//set material for bounding box
 		return 5;
 	}
 	if(abs(hit.norm.y) == 1.0){
-		return 1;
+		return 5;
 	}
 
 	return 2;
@@ -413,7 +414,7 @@ void Initialization(){
 	// Initialize water plane
 	sqLen = 10.;
 	eta = 0.8;
-	water = WaterPlane(vec3(0,1,0), -8.0, 4);
+	water = WaterPlane(vec3(0,1,0), 8.0, 4);
 }
 
 vec3 intersect(Ray eyeRay){//main ray bounce function
