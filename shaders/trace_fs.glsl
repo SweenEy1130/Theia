@@ -16,7 +16,23 @@ float noise( in vec3 x )
                mix(mix( hash(n+113.0), hash(n+114.0),f.x),
                    mix( hash(n+170.0), hash(n+171.0),f.x),f.y),f.z);
 }
-
+//random function from http://madebyevan.com/webgl-path-tracing/webgl-path-tracing.js
+float random(vec3 scale, float seed) {
+	return fract(sin(dot(gl_FragCoord.xyz + seed, scale)) * 43758.5453 + seed); 
+}
+vec3 uniformlyRandomDirection(float seed) {
+	float u = random(vec3(12.9898, 78.233, 151.7182), seed);
+	float v = random(vec3(63.7264, 10.873, 623.6736), seed);
+	float z = 1.0 - 2.0 * u;
+	float r = sqrt(1.0 - z * z);
+	float angle = 6.283185307179586 * v;
+	return vec3(r * cos(angle), r * sin(angle), z);
+}
+// random vector in the unit sphere
+// note: this is probably not statistically uniform, saw raising to 1/3 power somewhere but that looks wrong?
+vec3 uniformlyRandomVector(float seed) {
+	return uniformlyRandomDirection(seed) * sqrt(random(vec3(36.7539, 50.3658, 306.2759), seed));
+}
 //data structures
 struct Camera{
 	vec3 pos,rotv;
@@ -88,7 +104,7 @@ const int BOUNCE = 3;//max bounce time
 const float EPSILON = 0.001;//tolerance
 const float INFINITY = 10000.;
 const int X = 0, Y = 1, Z = 2;
-const int SAMPLE_NUM = 16;
+const int SAMPLE_NUM = 9;
 float KA = 0., KD = 1./mtlNum, KS = 2./mtlNum, MAP = 3./mtlNum, ATTR = 1.;
 float msample = sqrt(float(SAMPLE_NUM));
 float s;//seed for random generator
@@ -310,7 +326,8 @@ vec3 lightAt(Hit hit, vec3 N, vec3 V)//calculate light at a object point
 
 		//shadow
 		offset = vec3(randOffset(sampleCount), 0);
-		shadowRay = Ray(normalize(lights[i].posOrDir + offset*lights[i].size - hit.pos), hit.pos);
+		vec3 lightPos = lights[i].posOrDir + uniformlyRandomVector(globTime - 53.0)*lights[i].size.x - hit.pos;
+		shadowRay = Ray(normalize(lightPos), hit.pos);
 		if(hitSphere(shadowRay, sHit, true))
 			return c;
 
@@ -339,8 +356,8 @@ void Initialization(){
 	sphere[4] = Sphere(vec3(5, -2, -2), 1.,0);
 
 	// Initialize lights
-	lights[0] = Light(vec3(-10, 9, -1), vec3(0, 2, 1), false, LIGHT_AREA, 1., 1.);
-	lights[1] = Light(vec3(10, 10, 10), vec3(1, -2, 0), false, LIGHT_AREA, 1., 1.);
+	lights[0] = Light(vec3(-10, 9, -1), vec3(0.5, 0.5, 0), false, LIGHT_AREA, 1., 1.);
+	lights[1] = Light(vec3(10, 10, 10), vec3(0.5, 0.5, 0), false, LIGHT_AREA, 1., 1.);
 
 	// Initialize water plane
 	sqLen = 10.;
@@ -412,6 +429,9 @@ void main(void) {
 	color = intersect(eyeRay);//calculate current frame pixel color
 	pColor = texture2D(pTex, gl_FragCoord.xy/camera.res).rgb;//pixel color from pevious frame
 	// gl_FragColor = vec4(color, 1.);
-	gl_FragColor = vec4(mix(pColor,color,1./sampleCount), 1);//mix 2 color to achieve Antialiasing
+	if(sampleCount > float(2))
+		gl_FragColor = vec4(mix(pColor,color,1./float(2)), 1);
+		else
+		gl_FragColor = vec4(mix(pColor,color,1./sampleCount), 1);//mix 2 color to achieve Antialiasing
 	//gl_FragColor = vec4(texture2D(mtlTex, vec2(1. / 3., 3. /mtlNum)).rgb, 1);
 }
