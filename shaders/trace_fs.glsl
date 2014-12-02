@@ -1,4 +1,4 @@
-precision mediump float;
+precision highp float;
 
 float hash( float n )
 {
@@ -69,7 +69,7 @@ struct WaterPlane{
 struct Hit{
 	vec3 pos;
 	vec3 norm;
-	vec2 uv;//texture coord
+	bool underWater;
 	int mt;//point to
 };
 const int LIGHT_AREA = 1;
@@ -179,7 +179,8 @@ bool intersectWaterPlane(Ray eyeRay, WaterPlane plane, out float dist){
 	// n·(Ro + t * Rd) + D = 0
 	// t = -(D + n·Ro) / n·Rd
 	vec3 n = normalize(plane.norm);
-	// if (dot(n, eyeRay.dir) < .0) n = -n;
+	// If it is under water, reverse the normalize and D
+	if (dot(n, -eyeRay.dir) < .000001) {n = -n; plane.D = -plane.D;}
 	dist = -(plane.D + dot(n, eyeRay.origin)) / dot(n, eyeRay.dir);
 	if (dist < 0.) return false;
 	// add displacement to the dist
@@ -191,17 +192,15 @@ bool intersectWaterPlane(Ray eyeRay, WaterPlane plane, out float dist){
 // Map the hit position to texture coord
 // Only works for the Y axis plane
 vec2 texCordWater(vec3 pos){
-	vec2 uv;
-	uv = 0.5 * vec2((pos.x + sqLen) / sqLen, (pos.z + sqLen) / sqLen);
-	return uv;
+	return 0.5 * vec2((pos.x + sqLen) / sqLen, (pos.z + sqLen) / sqLen);;
 }
 
 // Get the water norm from the two normal texture
 vec3 getWaterNorm(vec3 pos){
 	vec2 uv = texCordWater(pos);
-	vec2 uv0 = vec2(mod(uv.x + 0.3 * globTime, 1.0), mod(uv.y + 0.1 * globTime, 1.0));
-	vec2 uv1 = vec2(mod(uv.x + 0.2 * globTime, 1.0), mod(uv.y - 0.2 * globTime, 1.0));
-	return normalize((texture2D(waterNorm0, uv0) + texture2D(waterNorm1, uv1)).xzy);
+	vec2 uv0 = vec2(fract(uv.x - 0.1 * globTime), fract(uv.y + 0.12 * globTime));
+	vec2 uv1 = vec2(fract(uv.x + 0.05 * globTime), fract(uv.y - 0.14 * globTime));
+	return normalize((texture2D(waterNorm0, uv0) + texture2D(waterNorm1, uv1) - 1.).xzy);
 }
 
 bool intersectSphere(Sphere sphere, Ray eyeRay, out float dist) {
@@ -311,6 +310,11 @@ vec3 lightAt(Hit hit, vec3 N, vec3 V)//calculate light at a object point
 		// enable pool texture
 		ka = kd = texture2D(poolTex, mapYaxis(hit.pos)).rgb;
 	}
+
+	// Under water
+	if (hit.underWater){
+		ka = 0.2 * ka + 1. * texture2D(mtlTex, vec2(KA, 4. / mtlNum)).xyz;
+	}
 	// Add ambient light
 	c += ambient(0.2) * ka;
 
@@ -352,7 +356,7 @@ void Initialization(){
 	// Initialize spheres
 	sphere[0] = Sphere(vec3(0, 0, -15), 1.,0);
 	sphere[1] = Sphere(vec3(1, 1, 1), 1.,0);
-	sphere[2] = Sphere(vec3(3, -2, -2), 1.,0);
+	sphere[2] = Sphere(vec3(3, -9, -5), 1.,0);
 	sphere[3] = Sphere(vec3(-5, 0, -2), 1.,0);
 	sphere[4] = Sphere(vec3(5, -2, -2), 1.,0);
 
@@ -363,7 +367,7 @@ void Initialization(){
 	// Initialize water plane
 	sqLen = 10.;
 	eta = 0.8;
-	water = WaterPlane(vec3(0,1,0), 8.0, 4);
+	water = WaterPlane(vec3(0,1,0), 3.0, 4);
 }
 
 vec3 intersect(Ray eyeRay){//main ray bounce function
@@ -373,9 +377,25 @@ vec3 intersect(Ray eyeRay){//main ray bounce function
 	Ray newRay;
 	for(int i = 0; i < BOUNCE; i++){
 		mDist = INFINITY;
+		// Hit water plane
+		if (intersectWaterPlane(eyeRay, water, dist) && dist < mDist){
+			mDist = dist;
+			hit.pos = eyeRay.origin + dist * eyeRay.dir;
+			hit.norm = getWaterNorm(hit.pos);
+			hit.mt = water.mt;
+
+			ncolor = lightAt(hit, -hit.norm, eyeRay.dir);
+			newAlpha = .7;
+			tcolor = (color * alpha + ncolor * (1. - alpha));
+			// tcolor = hit.norm;
+			newRay.origin = hit.pos;
+			newRay.dir = refract(eyeRay.dir, hit.norm, eta);
+		}
+
 		// hit spheres
-		if(hitSphere(eyeRay, hit, false)){
+		if(hitSphere(eyeRay, hit, false) && length(hit.pos - eyeRay.origin) < mDist){
 			mDist = length(hit.pos - eyeRay.origin);
+			// if (eyeRay.origin.y < -water.D / water.norm.y) hit.underWater = true;
 			ncolor = lightAt(hit, hit.norm, eyeRay.dir);
 			newAlpha = .5;
 			tcolor = (color * alpha + ncolor * (1. - alpha));
@@ -385,25 +405,10 @@ vec3 intersect(Ray eyeRay){//main ray bounce function
 			newRay.dir = reflect(eyeRay.dir, hit.norm);
 		}
 
-		// Hit water plane
-		if (intersectWaterPlane(eyeRay, water, dist) && dist < mDist){
-			mDist = dist;
-
-			hit.pos = eyeRay.origin + dist * eyeRay.dir;
-			hit.norm = getWaterNorm(hit.pos);
-			hit.mt = water.mt;
-			ncolor = lightAt(hit, -hit.norm, eyeRay.dir);
-
-			newAlpha = .7;
-			tcolor = (color * alpha + ncolor * (1. - alpha));
-
-			newRay.origin = hit.pos;
-			newRay.dir = refract(eyeRay.dir, hit.norm, eta);
-		}
-
 		//hit bounding box
 		if(intersectBox(eyeRay, room, dist) && dist < mDist){//intersect room return the distance between ray origin and hit spot
 			hit.pos = eyeRay.origin + dist * eyeRay.dir;
+			// if (eyeRay.origin.y < -water.D / water.norm.y) hit.underWater = true;
 			hit.norm = normalForBox(hit.pos, room);
 			hit.mt = dummySetMtl0(hit);//different merterial for different face
 			ncolor = lightAt(hit, -hit.norm, eyeRay.dir);//calculate inner color

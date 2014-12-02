@@ -57,11 +57,11 @@ function init(){
     Render.texImage = [];
     Render.texImage.push(Render.getTexture("models/wall-texture.jpg"));
     Render.texImage.push(Render.getTexture("models/wall_norm.jpg"));
-    Render.texImage.push(Render.getTexture("models/pool_tex.jpg"));
+    Render.texImage.push(Render.getTexture("models/pool_tex1.jpg"));
 
     Render.waterNorm = [];
-    Render.waterNorm.push(Render.getTexture("models/640-normal.jpg"));
-    Render.waterNorm.push(Render.getTexture("models/4483-normal.jpg"));
+    Render.waterNorm.push(Render.getTexture("models/2563-normal.jpg"));
+    Render.waterNorm.push(Render.getTexture("models/639-normal.jpg"));
 
     Gui.timeStart = Date.now();
     Gui.animate(0);
