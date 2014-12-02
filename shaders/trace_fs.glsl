@@ -74,6 +74,7 @@ uniform sampler2D pTex;//previous render result
 uniform sampler2D mtlTex;
 // Wall texture and normal map
 uniform sampler2D wallTex;
+// no use
 uniform sampler2D wallNorm;
 // Water normal map texture
 uniform sampler2D waterNorm0;
@@ -183,7 +184,7 @@ vec3 getWaterNorm(vec3 pos){
 	vec2 uv = texCordWater(pos);
 	vec2 uv0 = vec2(mod(uv.x + 0.3 * globTime, 1.0), mod(uv.y + 0.1 * globTime, 1.0));
 	vec2 uv1 = vec2(mod(uv.x + 0.2 * globTime, 1.0), mod(uv.y - 0.2 * globTime, 1.0));
-	return normalize((texture2D(waterNorm0, uv0) + texture2D(waterNorm1, uv1)).xyz);
+	return normalize((texture2D(waterNorm0, uv0) + texture2D(waterNorm1, uv1)).xzy);
 }
 
 bool intersectSphere(Sphere sphere, Ray eyeRay, out float dist) {
@@ -272,8 +273,10 @@ vec3 lightAt(Hit hit, vec3 N, vec3 V)//calculate light at a object point
 	ka = texture2D(mtlTex, vec2(KA, mtlCoord)).xyz;
 	kd = texture2D(mtlTex, vec2(KD, mtlCoord)).xyz;
 
-	if(map.y > 0.){//enable normal map
-		N = texture2D(wallNorm, mapXaxis(hit.pos)).rgb;
+	//enable normal map
+	// No use
+	if(map.y > 0.){
+		N = texture2D(wallNorm, mapXaxis(hit.pos)).zxy;
 	}
 	if(map.x > 0.){ // enable texture map
 		ka = kd = texture2D(wallTex, mapXaxis(hit.pos)).rgb;
@@ -287,7 +290,7 @@ vec3 lightAt(Hit hit, vec3 N, vec3 V)//calculate light at a object point
 		ns = attr.y;
 	}
 
-	if (hit.mt == 5){
+	if (hit.mt == 1){
 		// enable pool texture
 		ka = kd = texture2D(poolTex, mapYaxis(hit.pos)).rgb;
 	}
@@ -321,10 +324,7 @@ int dummySetMtl0(Hit hit){//set material for bounding box
 		return 3;
 	}
 	if(hit.norm.y == -1.0){
-		return 5;
-	}
-	if(abs(hit.norm.y) == 1.0){
-		return 5;
+		return 1;
 	}
 
 	return 2;
