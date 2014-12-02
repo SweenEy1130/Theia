@@ -18,7 +18,7 @@ float noise( in vec3 x )
 }
 //random function from http://madebyevan.com/webgl-path-tracing/webgl-path-tracing.js
 float random(vec3 scale, float seed) {
-	return fract(sin(dot(gl_FragCoord.xyz + seed, scale)) * 43758.5453 + seed); 
+	return fract(sin(dot(gl_FragCoord.xyz + seed, scale)) * 43758.5453 + seed);
 }
 vec3 uniformlyRandomDirection(float seed) {
 	float u = random(vec3(12.9898, 78.233, 151.7182), seed);
@@ -179,6 +179,7 @@ bool intersectWaterPlane(Ray eyeRay, WaterPlane plane, out float dist){
 	// n·(Ro + t * Rd) + D = 0
 	// t = -(D + n·Ro) / n·Rd
 	vec3 n = normalize(plane.norm);
+	// if (dot(n, eyeRay.dir) < .0) n = -n;
 	dist = -(plane.D + dot(n, eyeRay.origin)) / dot(n, eyeRay.dir);
 	if (dist < 0.) return false;
 	// add displacement to the dist
@@ -366,50 +367,59 @@ void Initialization(){
 }
 
 vec3 intersect(Ray eyeRay){//main ray bounce function
-	vec3 color = vec3(0), ncolor = vec3(0);//accumulated color and ncolor for current object
+	vec3 color = vec3(0), ncolor = vec3(0), tcolor = vec3(0);//accumulated color and ncolor for current object
 	Hit hit;
-	bool stop = false;
-	float dist, alpha = 1.;
-
+	float mDist = INFINITY, dist, alpha = 0., newAlpha;
+	Ray newRay;
 	for(int i = 0; i < BOUNCE; i++){
-		if(hitSphere(eyeRay, hit, false)){//hit anything inside box
-			ncolor = lightAt(hit, hit.norm, eyeRay.dir);//calculate color
-			alpha = 0.5;
-			color = i==0 ? ncolor : (color * alpha + ncolor * (1. - alpha));
+		mDist = INFINITY;
+		// hit spheres
+		if(hitSphere(eyeRay, hit, false)){
+			mDist = length(hit.pos - eyeRay.origin);
+			ncolor = lightAt(hit, hit.norm, eyeRay.dir);
+			newAlpha = .5;
+			tcolor = (color * alpha + ncolor * (1. - alpha));
+
 			//fire new ray
-			eyeRay.origin = hit.pos;
-			eyeRay.dir = reflect(eyeRay.dir, hit.norm);
-		}else{
-			//hit bounding box
-			if(intersectBox(eyeRay, room, dist)){//intersect room return the distance between ray origin and hit spot
-				hit.pos = eyeRay.origin + dist * eyeRay.dir;
-				hit.norm = normalForBox(hit.pos, room);
-				hit.mt = dummySetMtl0(hit);//different merterial for different face
-				ncolor = lightAt(hit, -hit.norm, eyeRay.dir);//calculate inner color
-			}
-
-			float mDist;
-			// Hit water plane
-			if (intersectWaterPlane(eyeRay, water, mDist) && dist > mDist){
-				hit.pos = eyeRay.origin + mDist * eyeRay.dir;
-				hit.norm = getWaterNorm(hit.pos);
-				hit.mt = water.mt;
-				ncolor = lightAt(hit, -hit.norm, eyeRay.dir);
-
-				eyeRay.origin = hit.pos;
-				eyeRay.dir = refract(eyeRay.dir, hit.norm, eta);
-				color = i==0 ? ncolor : (color * alpha + ncolor * (1. - alpha));
-				alpha = .8;
-				continue;
-			}else{
-				color = i==0 ? ncolor : (color * alpha + ncolor * (1. - alpha));
-				stop = true;
-			}
+			newRay.origin = hit.pos;
+			newRay.dir = reflect(eyeRay.dir, hit.norm);
 		}
 
-		if(stop) break;
+		// Hit water plane
+		if (intersectWaterPlane(eyeRay, water, dist) && dist < mDist){
+			mDist = dist;
+
+			hit.pos = eyeRay.origin + dist * eyeRay.dir;
+			hit.norm = getWaterNorm(hit.pos);
+			hit.mt = water.mt;
+			ncolor = lightAt(hit, -hit.norm, eyeRay.dir);
+
+			newAlpha = .7;
+			tcolor = (color * alpha + ncolor * (1. - alpha));
+
+			newRay.origin = hit.pos;
+			newRay.dir = refract(eyeRay.dir, hit.norm, eta);
+		}
+
+		//hit bounding box
+		if(intersectBox(eyeRay, room, dist) && dist < mDist){//intersect room return the distance between ray origin and hit spot
+			hit.pos = eyeRay.origin + dist * eyeRay.dir;
+			hit.norm = normalForBox(hit.pos, room);
+			hit.mt = dummySetMtl0(hit);//different merterial for different face
+			ncolor = lightAt(hit, -hit.norm, eyeRay.dir);//calculate inner color
+			// mDist = dist;
+			// newAlpha = 1.;
+			tcolor = (color * alpha + ncolor * (1. - alpha));
+			break;
+			//fire new ray
+			// newRay.origin = hit.pos;
+			// newRay.dir = reflect(eyeRay.dir, hit.norm);
+		}
+		eyeRay = newRay;
+		alpha = newAlpha;
+		color = tcolor;
 	}
-	return color;
+	return tcolor;
 }
 
 void main(void) {
