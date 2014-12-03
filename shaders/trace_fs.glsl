@@ -198,8 +198,7 @@ bool intersectWaterPlane(in Ray eyeRay, in WaterPlane plane, out float dist){
 	dist = -(D + dot(n, eyeRay.origin)) / dot(n, eyeRay.dir);
 	if (dist < 0.) return false;
 	// add displacement to the dist
-	vec3 position = eyeRay.dir * dist + eyeRay.origin;
-	float deltal = 2.0 * noise( 0.05 * position + 2.0 * globTime);
+	float deltal = 2.0 * noise( 0.05 * eyeRay.dir * dist + 2.0 * globTime);
 	dist += deltal;
 	deltah = eyeRay.dir.y * deltal;
 	return true;
@@ -265,7 +264,9 @@ bool hitSomething(in Ray eyeRay, out Hit hit, bool once){
 			return false;
 		if(bounceTime == 0)
 			hitWater = true;
-		hit.norm =  getWaterNorm(hit.pos);
+		hit.norm = getWaterNorm(hit.pos);
+		if (eyeRay.origin.y <  - water.D / water.norm.y + deltah)
+			hit.norm = - hit.norm;
 		hit.mt = water.mt;
 	}
 	if(mDist == INFINITY)
@@ -394,11 +395,11 @@ int dummySetMtl0(Hit hit){//set material for bounding box
 	if(abs(hit.norm.y) == 1.0){
 		return 5;
 	}
-	return 2;
+	return 1;
 }
 void Initialization(){
 	// Initialize spheres
-	sphere[0] = Sphere(vec3(0, 0, -15), 1.,0);
+	sphere[0] = Sphere(vec3(4, -8, -10), 1.,2);
 	sphere[1] = Sphere(vec3(1, 1, 1), 1.,0);
 	sphere[2] = Sphere(vec3(3, -9, -5), 2.,0);
 	sphere[3] = Sphere(vec3(-5, 0, -2), 1.,0);
