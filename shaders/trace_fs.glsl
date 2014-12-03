@@ -193,7 +193,8 @@ bool intersectWaterPlane(in Ray eyeRay, in WaterPlane plane, out float dist){
 	float D = plane.D;
 
 	// If it is under water, reverse the normalize and D
-	if (dot(n, -eyeRay.dir) < .000001) {n = -n; D = -D;}
+	if (dot(n, -eyeRay.dir) < .000001) {D -= deltah / n.y; n = -n; D = -D;}
+	else {D += deltah / n.y;}
 	dist = -(D + dot(n, eyeRay.origin)) / dot(n, eyeRay.dir);
 	if (dist < 0.) return false;
 	// add displacement to the dist
@@ -319,7 +320,7 @@ vec3 lightAt(in Hit hit, in vec3 N, inout Ray eyeRay)//calculate light at a obje
 	float alpha = 1.;//transparency 1->not transparent
 	int illum = 0;//material type
 	float mtlCoord = float(hit.mt) / mtlNum;//change material index to uv coord
-	
+
 	//get matieral information from texture
 	attr = texture2D(mtlTex, vec2(ATTR, mtlCoord)).xyz;//x->illum y->ns z->d
 	illum = int(attr.x);//material type, diffuse, reflective or transparent
@@ -327,13 +328,13 @@ vec3 lightAt(in Hit hit, in vec3 N, inout Ray eyeRay)//calculate light at a obje
 	//get ka, kd, ks, ns according to different material
 	ka = texture2D(mtlTex, vec2(KA, mtlCoord)).xyz;
 	kd = texture2D(mtlTex, vec2(KD, mtlCoord)).xyz;
-	
+
 	//ns = attr.y;//specular power
 	if(hit.mt == 3){//wall texture
 		ka = kd = texture2D(wallTex, mapXaxis(hit.pos)).rgb;
 	}
 	if(hit.mt == 5){// enable pool texture
-		ka = kd = texture2D(poolTex, mapYaxis(hit.pos)).rgb;			
+		ka = kd = texture2D(poolTex, mapYaxis(hit.pos)).rgb;
 	}
 	if(illum == 3){//reflective material such as metal
 		//(Zhang)note:Here actually should be a new reflect or transmit ray function relating to transparency coefficient d
@@ -353,11 +354,11 @@ vec3 lightAt(in Hit hit, in vec3 N, inout Ray eyeRay)//calculate light at a obje
 	//diffuse material without specular light
 	//alpha = illum == 0 ? 1. / PI : 1.;
 	// Under water
-/*	if (hit.pos.y < - water.D / water.norm.y + deltah){
+	if (camera.pos.y < - water.D / water.norm.y + deltah){
 		ka = .2 * ka + .8 * texture2D(mtlTex, vec2(KA, 4. / mtlNum)).xyz;
-		kd = .2 * kd + .2 * texture2D(mtlTex, vec2(KD, 4. / mtlNum)).xyz;
-		ks = .4 * ks + .2 * texture2D(mtlTex, vec2(KS, 4. / mtlNum)).xyz;
-	}*/
+		// kd = .2 * kd + .2 * texture2D(mtlTex, vec2(KD, 4. / mtlNum)).xyz;
+		// ks = .4 * ks + .2 * texture2D(mtlTex, vec2(KS, 4. / mtlNum)).xyz;
+	}
 	// Add ambient light
 	c += ambient(0.2) * ka * attr.z;
 	Hit sHit;
@@ -365,7 +366,7 @@ vec3 lightAt(in Hit hit, in vec3 N, inout Ray eyeRay)//calculate light at a obje
 	vec3 V = - normalize(eyeRay.origin - hit.pos);
 	float attenuation = 1.;
 	Ray shadowRay;
-	//set origin 
+	//set origin
 	eyeRay.origin = hit.pos;
 
 	for(int i = 0; i < LIGHT_NUM; i++){
@@ -437,9 +438,9 @@ vec3 intersect(Ray eyeRay){//main ray bounce function
 		}
 		alpha *= .75;
 		ncolor = lightAt(hit, hit.norm, eyeRay);//calculate inner color
-		
+
 		color += ncolor * alpha;
-		
+
 	}
 	return color;
 }
@@ -456,7 +457,7 @@ void main(void) {
 	color = intersect(eyeRay);//calculate current frame pixel color
 	pColor = texture2D(pTex, gl_FragCoord.xy/camera.res).rgb;//pixel color from pevious frame
 	if(hitWater)
-		gl_FragColor = vec4(mix(pColor,color,1./2.), 1);
+		gl_FragColor = vec4(mix(pColor,color,1./1.), 1);
 	else
 		gl_FragColor = vec4(mix(pColor,color,1./sampleCount), 1);//mix 2 color to achieve Antialiasing
 	//gl_FragColor = vec4(texture2D(mtlTex, vec2(1. / 3., 3. /mtlNum)).rgb, 1);
