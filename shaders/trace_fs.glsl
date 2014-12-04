@@ -159,7 +159,7 @@ mat3 getRotMat(float degree, int choice){
 	else return mat3(1, 0, 0, 0, 1, 0, 0, 0, 1);
 }
 
-bool intersectBox(in Ray eyeRay,Box box, out float dist){//ray box intersect
+bool intersectBox(in Ray eyeRay,Box box, inout float dist){//ray box intersect
 	vec3 tMin = (box.min - eyeRay.origin) / eyeRay.dir;
 	vec3 tMax = (box.max - eyeRay.origin) / eyeRay.dir;
 	vec3 t1 = min(tMin, tMax);
@@ -182,7 +182,7 @@ vec3 normalForBox(vec3 hit, in Box box){
 	return vec3(0.0, 0.0, 1.0);
 }
 
-bool intersectWaterPlane(in Ray eyeRay, in WaterPlane plane, out float dist){
+bool intersectWaterPlane(in Ray eyeRay, in WaterPlane plane, inout float dist){
 	// ray water intersect
 	// P(t) = Ro + t * Rd
 	// H(P) = n·P + D = 0
@@ -217,7 +217,7 @@ vec3 getWaterNorm(vec3 pos){
 	return normalize((texture2D(waterNorm0, uv0) + texture2D(waterNorm1, uv1) - 1.).xzy);
 }
 
-bool intersectSphere(in Sphere sphere, in Ray eyeRay, out float dist) {
+bool intersectSphere(in Sphere sphere, in Ray eyeRay, inout float dist) {
 	vec3 c = sphere.pos - eyeRay.origin;
 	float b = dot(eyeRay.dir, c);
 	if(b < 0.0)
