@@ -162,17 +162,35 @@ var Gui = {
 				Gui.sampleCount = 0;
 				break;
 			case 65://a
-				var vec = Gui.getLeftRightVector(0);
-				Camera.pos[0] += vec[0]*0.1;
-				Camera.pos[1] += vec[1]*0.1;
-				Camera.pos[2] += vec[2]*0.1;
+				var vec;
+				if (Gui.lookAt[2] > 0){
+					vec = Gui.getLeftRightVector(0);
+					Camera.pos[0] += vec[0]*0.1;
+					Camera.pos[1] += vec[1]*0.1;
+					Camera.pos[2] += vec[2]*0.1;
+				}
+				else {
+					vec = Gui.getLeftRightVector(1);
+					Camera.pos[0] += vec[0]*0.1;
+					Camera.pos[1] += vec[1]*0.1;
+					Camera.pos[2] += vec[2]*0.1;
+				}
 				Gui.sampleCount = 0;
 				break;
 			case 68://d
-				var vec = Gui.getLeftRightVector(1);
-				Camera.pos[0] += vec[0]*0.1;
-				Camera.pos[1] += vec[1]*0.1;
-				Camera.pos[2] += vec[2]*0.1;
+				var vec;
+				if (Gui.lookAt[2] > 0){
+					vec = Gui.getLeftRightVector(1);
+					Camera.pos[0] += vec[0]*0.1;
+					Camera.pos[1] += vec[1]*0.1;
+					Camera.pos[2] += vec[2]*0.1;
+				}
+				else {
+					vec = Gui.getLeftRightVector(0);
+					Camera.pos[0] += vec[0]*0.1;
+					Camera.pos[1] += vec[1]*0.1;
+					Camera.pos[2] += vec[2]*0.1;
+				}
 				Gui.sampleCount = 0;
 				break;
 
