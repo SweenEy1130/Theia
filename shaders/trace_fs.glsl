@@ -456,7 +456,7 @@ void main(void) {
 	// Initialize spheres, lights and other objects
 	Initialization();
 	//fire random ray
-	randVec = uniformlyRandomVector(globTime);//get a random vector for random sampling
+	randVec = uniformlyRandomVector(sampleCount);//get a random vector for random sampling
 	Ray eyeRay = Ray(trans*vec3((gl_FragCoord.xy+ randVec.xy -camera.res/2.)/camera.res.yy * camera.fov_factor,1),camera.pos);//fire eye ray
 	eyeRay.dir = normalize(eyeRay.dir);
 
@@ -464,7 +464,9 @@ void main(void) {
 	pColor = texture2D(pTex, gl_FragCoord.xy/camera.res).rgb;//pixel color from pevious frame
 	if(hitWater)
 		gl_FragColor = vec4(mix(pColor,color,1./1.), 1);
-	else
+	else if(sampleCount < 64.) //white noise accurs when oversampling
 		gl_FragColor = vec4(mix(pColor,color,1./sampleCount), 1);//mix 2 color to achieve Antialiasing
+	else
+		gl_FragColor = vec4(pColor,1);
 	//gl_FragColor = vec4(texture2D(mtlTex, vec2(1. / 3., 3. /mtlNum)).rgb, 1);
 }
