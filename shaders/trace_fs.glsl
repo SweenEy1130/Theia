@@ -159,11 +159,12 @@ mat3 getRotMat(float degree, int choice){
 	else return mat3(1, 0, 0, 0, 1, 0, 0, 0, 1);
 }
 
-bool intersectBox(in Ray eyeRay,Box box, inout float dist){//ray box intersect
+bool intersectBox(in Ray eyeRay,Box box, out float dist){//ray box intersect
 	vec3 tMin = (box.min - eyeRay.origin) / eyeRay.dir;
 	vec3 tMax = (box.max - eyeRay.origin) / eyeRay.dir;
 	vec3 t1 = min(tMin, tMax);
 	vec3 t2 = max(tMin, tMax);
+	dist = INFINITY;
 	float tNear = max(max(t1.x, t1.y), t1.z);
 	float tFar = min(min(t2.x, t2.y), t2.z);
 	dist = tFar;
@@ -182,7 +183,7 @@ vec3 normalForBox(vec3 hit, in Box box){
 	return vec3(0.0, 0.0, 1.0);
 }
 
-bool intersectWaterPlane(in Ray eyeRay, in WaterPlane plane, inout float dist){
+bool intersectWaterPlane(in Ray eyeRay, in WaterPlane plane, out float dist){
 	// ray water intersect
 	// P(t) = Ro + t * Rd
 	// H(P) = n·P + D = 0
@@ -191,6 +192,7 @@ bool intersectWaterPlane(in Ray eyeRay, in WaterPlane plane, inout float dist){
 	vec3 n = normalize(plane.norm);
 	float D = plane.D;
 
+	dist = INFINITY;
 	// If it is under water, reverse the normalize and D
 	if (dot(n, -eyeRay.dir) < .000001) {D -= deltah / n.y; n = -n; D = -D;}
 	else {D += deltah / n.y;}
@@ -217,9 +219,10 @@ vec3 getWaterNorm(vec3 pos){
 	return normalize((texture2D(waterNorm0, uv0) + texture2D(waterNorm1, uv1) - 1.).xzy);
 }
 
-bool intersectSphere(in Sphere sphere, in Ray eyeRay, inout float dist) {
+bool intersectSphere(in Sphere sphere, in Ray eyeRay, out float dist) {
 	vec3 c = sphere.pos - eyeRay.origin;
 	float b = dot(eyeRay.dir, c);
+	dist = INFINITY;
 	if(b < 0.0)
 	return false;
 	float d = dot(c, c) - b*b;
