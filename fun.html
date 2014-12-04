@@ -1,15 +1,135 @@
+<!DOCTYPE html> 
+<html>
+
 <head>
-<script type="text/javascript" src = "math.min.js"></script>
-<script type="text/javascript" src = "jquery-2.1.1.min.js"></script>
-<script type="text/javascript" src = "parser.js"></script>
-<script type = "text/javascript"  src = "fun_uti.js"></script>
-<script type = "text/javascript" src = "fun_render.js"></script>
-<script type = "text/javascript"  src = "fun_gui.js"></script>
-<script type = "text/javascript" src = "fun_main.js"></script>
+  <title>Theia Project</title>
+  <meta name="description" content="website description" />
+  <meta name="keywords" content="website keywords, website keywords" />
+  <meta http-equiv="content-type" content="text/html; charset=windows-1252" />
+  <link rel="stylesheet" type="text/css" href="css/style.css" />
+  <!-- modernizr enables HTML5 elements and feature detects -->
+  <script type="text/javascript" src="js/modernizr-1.5.min.js"></script>
+  <script type="text/javascript" src = "math.min.js"></script>
+  <script type="text/javascript" src = "jquery-2.1.1.min.js"></script>
+  <script type="text/javascript" src = "parser.js"></script>
+  <script type = "text/javascript"  src = "fun_uti.js"></script>
+  <script type = "text/javascript" src = "fun_render.js"></script>
+  <script type = "text/javascript"  src = "fun_gui.js"></script>
+  <script type = "text/javascript" src = "fun_main.js"></script>
 </head>
+
 <body>
-<canvas id = "canv"></canvas>
-<label id = "fps"></label>
-<button id = "btn_pause">Pause</button>
-<button id = "btn_start">Start</button>
+  <div id="main">		
+
+    <header>
+	  <div id="strapline">
+	    <div id="welcome_slogan">
+	      <h3>Welcome To Thiea <span>Water</span></h3>
+	    </div><!--close welcome_slogan-->
+      </div><!--close strapline-->	  
+<!-- 	  <nav>
+	    <div id="menubar">
+          <ul id="nav">
+            <li class="current"><a href="index.html">Home</a></li>
+            <li><a href="ourwork.html">Our Work</a></li>
+            <li><a href="testimonials.html">Testimonials</a></li>
+            <li><a href="projects.html">Projects</a></li>
+            <li><a href="contact.html">Contact Us</a></li>
+          </ul>
+        </div><!--close menubar-->	
+      <!-- </nav> -->
+    </header>
+    
+	<div id="site_content">		
+	  
+	  <div class="sidebar_container">       
+		  <div class="sidebar">
+          <div class="sidebar_item">
+            <h3>December 2014</h3>
+            <p>The target of this project is to display a room with raytracing.</p>         
+		  </div><!--close sidebar_item--> 
+        </div><!--close sidebar-->  		
+        <div class="sidebar">
+          <div class="sidebar_item">
+            <h2>Contact</h2>
+            <p>Zheng Li</p>
+            <p>Email: <a href="mailto:zli021@usc.edu">zli021@usc.edu</a></p>
+          </div><!--close sidebar_item--> 
+        </div><!--close sidebar-->
+        <div class="sidebar">
+          <div class="sidebar_item">
+            <h2>Contact</h2>
+            <p>Xi Zhang</p>
+            <p>Email: <a href="mailto:zhan323@usc.edu">zhan323@usc.edu</a></p>
+          </div><!--close sidebar_item--> 
+        </div><!--close sidebar-->
+        <div class="sidebar">
+          <div class="sidebar_item">
+            <h2>Contact</h2>
+            <p>Hanyu Xue</p>
+            <p>Email: <a href="mailto:hanyux@usc.edu">hanyux@usc.edu</a></p>
+          </div><!--close sidebar_item--> 
+        </div><!--close sidebar-->
+        <div class="sidebar">
+          <div class="sidebar_item">
+            <h2>Contact</h2>
+            <p>Ruijun Wang</p>
+            <p>Email: <a href="mailto:ruijunwa@usc.edu">ruijunwa@usc.edu</a></p>
+          </div><!--close sidebar_item--> 
+        </div><!--close sidebar-->
+        <div class="sidebar">
+          <div class="sidebar_item">
+            <h2>Contact</h2>
+            <p>Zhitao Zhou</p>
+            <p>Email: <a href="mailto:zhitaoz@usc.edu">zhitaoz@usc.edu</a></p>
+          </div><!--close sidebar_item--> 
+        </div><!--close sidebar-->
+       </div><!--close sidebar_container-->	
+
+      <div class="slideshow">
+	    <ul class="slideshow">
+          <li class="show"><img width="680" height="250" src="images/home_1.jpg" alt="&quot;Theia Project From L & W Team&quot;" /></li>
+          <li><img width="680" height="250" src="images/home_2.jpg" alt="&quot;Theia Project From L & W Team&quot;" /></li>
+        </ul> 
+	  </div>
+	  <canvas id = "canv"></canvas>
+    <label id = "fps" style="color: red"></label>
+    <button id = "btn_pause">Pause</button>
+    <button id = "btn_start">Start</button>
+	  <div id="content">
+        <div class="content_item">
+<!-- 		  <h1>Welcome To Theia Project</h1> 
+          <p>This standards compliant, simple, fixed width website template is released as an 'open source' design (under the Creative Commons Attribution 3.0 Licence), which means that you are free to download and use it for anything you want (including modifying and amending it). If you wish to remove the &ldquo;website template by Free HTML5 Templates&rdquo;, all I ask is for a donation of &pound;20.00 GBP. Please feel free to contact me with any questions you may have about my free HTML5 website templates or bespoke work.</p>   		
+		  <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Morbi elit sapien, tempus sit amet hendrerit volutpat, euismod vitae risus. Etiam consequat, sem et vulputate dapibus, diam enim tristique est, vitae porta eros mauris ut orci. Praesent sed velit odio. Ut massa arcu, suscipit viverra molestie at, aliquet a metus. Nullam sit amet tellus dui, ut tincidunt justo. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec iaculis egestas laoreet. Nunc non ipsum metus, non laoreet urna. Vestibulum quis risus quis diam mattis tempus. Vestibulum suscipit pretium tempor. </p> -->
+	  
+		  <div class="content_container">
+		    <h2>Ray Tracing</h2>
+        <p> Shoot a ray from each pixel Translate the ray direction from camera space to world space by rtrans matrix and rotate matrix</p>
+<!-- 		  	<div class="button_small">
+		      <a href="#">Read more</a>
+		    </div> --><!--close button_small-->
+		  </div><!--close content_container-->
+          <div class="content_container">
+          <h2> Motion Blur </h2>
+		      <p>Achieved by super sampling over time in fragment shader. Using velocity of mousemove event.</p>          
+<!-- 		  	<div class="button_small">
+		      <a href="#">Read more</a>
+		    </div> --><!--close button_small-->		  
+		  </div><!--close content_container-->	
+		  
+		</div><!--close content_item-->
+      </div><!--close content-->   
+	</div><!--close site_content-->  	
+
+    <footer>
+      <a href="http://sites.google.com/site/cs580finaldummy">Google Site</a> | <a href="https://github.com/SweenEy1130/CSCI-580-Final">Github</a>
+    </footer>
+	
+  </div><!--close main-->
+  
+  <!-- javascript at the bottom for fast page loading -->
+  <script type="text/javascript" src="js/jquery.min.js"></script>
+  <script type="text/javascript" src="js/image_slide.js"></script>
+  
 </body>
+</html>
