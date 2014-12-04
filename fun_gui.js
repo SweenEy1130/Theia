@@ -211,9 +211,9 @@ var Gui = {
 			gl.uniform1i(Render.program.poolTexLoc, 6);
 			gl.bindTexture(gl.TEXTURE_2D,Render.texImage[2].tex);
 		}
-
 		Camera.getRTrans();//update translate matrix
-		Gui.sampleCount > 3 ? 0: Gui.sampleCount++;//when there is no motion, samplecount increase with frames rendered to achieve antialiasing.
+		Gui.sampleCount++;
+		//Gui.sampleCount > 3 ? 0: Gui.sampleCount++;//when there is no motion, samplecount increase with frames rendered to achieve antialiasing.
 
 		Render.updateShaderParams(Render.program);
 		//material as texture for achieve ka, kd, ks for different object
