@@ -159,7 +159,6 @@ mat3 getRotMat(float degree, int choice){
 	else return mat3(1, 0, 0, 0, 1, 0, 0, 0, 1);
 }
 
-
 bool intersectBox(in Ray eyeRay,Box box, out float dist){//ray box intersect
 	vec3 tMin = (box.min - eyeRay.origin) / eyeRay.dir;
 	vec3 tMax = (box.max - eyeRay.origin) / eyeRay.dir;
@@ -400,16 +399,16 @@ int dummySetMtl0(Hit hit){//set material for bounding box
 		return 5;
 	}
 	if (hit.norm.y == -1.0)
-		return 0;
+		return 6;
 	return 1;
 }
 void Initialization(){
 	// Initialize spheres
-	sphere[0] = Sphere(vec3(4, -8, -10), 1.,2);
-	sphere[1] = Sphere(vec3(1, 1, 1), 1.,0);
-	sphere[2] = Sphere(vec3(3, -9, -5), 2.,0);
-	sphere[3] = Sphere(vec3(-5, 0, -2), 1.,0);
-	sphere[4] = Sphere(vec3(5, -2, -2), 1.,0);
+	sphere[0] = Sphere(vec3(4, -9, -5.288675), 1.,0);
+	sphere[1] = Sphere(vec3(2, -9, -5.288675), 1.,0);
+	sphere[2] = Sphere(vec3(3, -7.3457, -5), 1.,2);
+	sphere[3] = Sphere(vec3(3, -9, -3.82265), 1.,0);
+	sphere[4] = Sphere(vec3(6, -8, 6), 2.,0);
 
 	// Initialize lights
 	lights[0] = Light(vec3(0, 10, 0), 0.5 /*size*/, true, LIGHT_AREA, 1., 1.);
