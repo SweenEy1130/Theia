@@ -331,7 +331,11 @@ vec3 lightAt(in Hit hit, in vec3 N, inout Ray eyeRay)//calculate light at a obje
 	kd = texture2D(mtlTex, vec2(KD, mtlCoord)).xyz;
 
 	//ns = attr.y;//specular power
-	if(hit.mt == 3){//wall texture
+	if (hit.mt == 1){
+		ka = kd = texture2D(wallNorm, mapZaxis(hit.pos)).rgb;
+	}
+
+	if(hit.mt == 3){// left & right
 		ka = kd = texture2D(wallTex, mapXaxis(hit.pos)).rgb;
 	}
 	if(hit.mt == 5){// enable pool texture
@@ -392,9 +396,11 @@ int dummySetMtl0(Hit hit){//set material for bounding box
 	if(abs(hit.norm.x) == 1.0){
 		return 3;
 	}
-	if(abs(hit.norm.y) == 1.0){
+	if(hit.norm.y == 1.0){
 		return 5;
 	}
+	if (hit.norm.y == -1.0)
+		return 0;
 	return 1;
 }
 void Initialization(){
@@ -406,7 +412,7 @@ void Initialization(){
 	sphere[4] = Sphere(vec3(5, -2, -2), 1.,0);
 
 	// Initialize lights
-	lights[0] = Light(vec3(-10, 9, -1), 0.5 /*size*/, true, LIGHT_AREA, 1., 1.);
+	lights[0] = Light(vec3(0, 10, 0), 0.5 /*size*/, true, LIGHT_AREA, 1., 1.);
 	lights[0] = Light(vec3(-10, 10, 10), 0.5 /*size*/, false, LIGHT_AREA, 1., 1.);
 
 	// Initialize water plane

@@ -59,8 +59,8 @@ function init(){
     Render.tex.push(Render.makeTexture());
 
     Render.texImage = [];
-    Render.texImage.push(Render.getTexture("models/wall-texture.jpg"));
-    Render.texImage.push(Render.getTexture("models/wall_norm.jpg"));
+    Render.texImage.push(Render.getTexture("models/wall-texture1.jpg"));
+    Render.texImage.push(Render.getTexture("models/wall-texture2.jpg"));
     Render.texImage.push(Render.getTexture("models/pool_tex1.jpg"));
 
     Render.waterNorm = [];
