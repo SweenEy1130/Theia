@@ -51,6 +51,7 @@ var Render = {
 
 		program.timeLoc = gl.getUniformLocation(program, "globTime");
 		program.mtlNumLoc = gl.getUniformLocation(program, "mtlNum");
+		program.stopMotionLoc = gl.getUniformLocation(program, "stopMotion")
 	},
 	getShaderProgram : function(vs_url, fs_url){//getShader program using vertex shader file and fragment shader file
 		var vertexShader = this.getShader(vs_url, gl.VERTEX_SHADER);
@@ -92,8 +93,10 @@ var Render = {
 
 	},
 	updateShaderParams : function(program){
+		Gui.timeLast = !Gui.stop ? Date.now()-Gui.timeStart : Gui.timeLast;
+		gl.uniform1f(program.stopMotionLoc, Gui.stop ? 1 : 0);
 		gl.uniform1f(program.sampleCountLoc, Gui.sampleCount);//number of samples achieved for antialiasing
-		gl.uniform1f(program.timeLoc, (Date.now()-Gui.timeStart)/1000.);//time since start, seconds
+		gl.uniform1f(program.timeLoc, /*(Gui.stop ? Gui.timeAccumulate : Gui.timeLast)*/Gui.timeLast/1000.);//time since start, seconds
 		gl.uniform1f(program.camFovLoc, Math.tan(Uti.radians(Camera.fov/2)));//camera field of view
 		gl.uniform2fv(program.camResLoc, Camera.res);//screen resolution
 		gl.uniform3fv(program.camPosLoc, Camera.pos);//camera position

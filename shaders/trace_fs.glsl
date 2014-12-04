@@ -124,6 +124,7 @@ uniform sampler2D waterNorm1;
 uniform sampler2D poolTex;
 
 uniform highp float globTime;
+uniform float stopMotion;
 //const setting
 const int BOUNCE = 3;//max bounce time
 const float EPSILON = 0.001;//tolerance
@@ -355,7 +356,7 @@ vec3 lightAt(in Hit hit, in vec3 N, inout Ray eyeRay)//calculate light at a obje
 		}
 	}
 	else{
-		eyeRay.dir = newDiffuseRay(globTime + float(bounceTime),N);
+		eyeRay.dir = newDiffuseRay(sampleCount + float(bounceTime),N);
 	}
 	eyeRay.dir = normalize(eyeRay.dir);
 	//diffuse material without specular light
@@ -465,7 +466,7 @@ void main(void) {
 
 	color = intersect(eyeRay);//calculate current frame pixel color
 	pColor = texture2D(pTex, gl_FragCoord.xy/camera.res).rgb;//pixel color from pevious frame
-	if(hitWater)
+	if(hitWater && stopMotion < .9)
 		gl_FragColor = vec4(mix(pColor,color,1./1.), 1);
 	else if(sampleCount < 64.) //white noise accurs when oversampling
 		gl_FragColor = vec4(mix(pColor,color,1./sampleCount), 1);//mix 2 color to achieve Antialiasing

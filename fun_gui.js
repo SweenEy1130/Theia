@@ -5,6 +5,9 @@ var Gui = {
 	time : -1,
 	sampleCount: 0,//when there is no motion, samplecount increase with frames rendered to achieve antialiasing.
 	timeStart : 0,
+	timeLast : 0,
+	timeAccumulate:0,
+	stop : 0,
 	lookAt:[0,0,1],
 	rotate:[0,0,0],
 	up : [0,1,0],

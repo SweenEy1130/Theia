@@ -9,6 +9,16 @@ function init(){
 	canvas.addEventListener("mouseup", Gui.mouseUp, false);
 	canvas.addEventListener("mouseout", Gui.mouseUp, false);
 	document.addEventListener("keydown", Gui.keyDown, false);
+	$("#btn_pause").click(function(){
+		Gui.stop = 1;
+		Gui.sampleCount = 0;
+	});
+	$("#btn_start").click(function(){
+		Gui.timeStart = Date.now();
+		Gui.timeAccumulate = Gui.timeLast;
+		Gui.stop = 0;
+		Gui.sampleCount = 0;
+	});
 	window.onbeforeunload = function(){
 		gl.deleteProgram(Render.program);
 		gl.deleteProgram(Render.drawProg);
