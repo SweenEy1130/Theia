@@ -7,6 +7,8 @@ var Gui = {
 	timeStart : 0,
 	timeLast : 0,
 	timeAccumulate:0,
+	timePrev20 : 0,
+	prevCounter : 0,
 	stop : 0,
 	lookAt:[0,0,1],
 	rotate:[0,0,0],
@@ -57,7 +59,7 @@ var Gui = {
 		f = math.multiply(f,rotateXMatrix);
 		f = math.multiply(f,rotateYMatrix);
 		f = this.normalize(f);
-		Gui.up = f;  
+		Gui.up = f;
 	},
 	getLeftRightVector : function(dir) {
 		var f = this.normalize(Gui.lookAt);
@@ -84,7 +86,7 @@ var Gui = {
 			else {
 				if (vertical[0] > 0)
 					vertical = math.multiply(vertical,-1);
-			}			
+			}
 		}
 		vertical = this.normalize(vertical);
 		return vertical;
@@ -156,7 +158,7 @@ var Gui = {
 				Camera.pos[1] -= Gui.lookAt[1] * 0.1;
 				// Camera.pos[0] = math.max(Camera.pos[1],-10);
 				Camera.pos[2] -= Gui.lookAt[2] * 0.1;
-				// Camera.pos[0] = math.max(Camera.pos[2],-20);				
+				// Camera.pos[0] = math.max(Camera.pos[2],-20);
 				Gui.sampleCount = 0;
 				break;
 			case 65://a
@@ -249,10 +251,16 @@ var Gui = {
 		gl.bindTexture(gl.TEXTURE_2D, null);
 	},
 	animate : function(time) {
+		Gui.prevCounter++;
+		if (Gui.prevCounter == 20){
+			document.getElementById("fps").innerHTML = "fps:\t" + (20000/(Date.now() - Gui.timePrev20)).toFixed(1);
+			Gui.timePrev20 = Date.now();
+			Gui.prevCounter = 0;
+		}
+		Gui.timeNow = Date.now();
 		Gui.renderToBuffer();
 		Gui.drawToScreen();
 		gl.flush();
 		window.requestAnimationFrame(Gui.animate);
-
   }
 }
