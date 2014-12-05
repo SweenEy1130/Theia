@@ -160,6 +160,148 @@ mat3 getRotMat(float degree, int choice){
 	else return mat3(1, 0, 0, 0, 1, 0, 0, 0, 1);
 }
 
+//han
+vec3 octahe[8];
+
+int fToO(in int i){
+	if(i == 8)
+		return 0;
+	return i;
+}
+
+bool IntersectTriangle(in Ray eyeRay,in vec3 tri1,in vec3 tri2,in vec3 tri3, out vec3 hitPoint, out vec3 normal)
+{
+    // E1
+    vec3 E1 = tri2 - tri1;
+
+    // E2
+    vec3 E2 = tri3 - tri1;
+
+    // P
+    vec3 P = cross(eyeRay.dir,E2);
+
+    // determinant
+    float det = dot(E1 , P);
+
+    // keep det > 0, modify T accordingly
+    vec3 T;
+    if( det > 0.0 )
+    {
+        T = eyeRay.origin - tri1;
+    }
+    else
+    {
+        T = tri1 - eyeRay.origin;
+        det = -det;
+    }
+
+    // If determinant is near zero, ray lies in plane of triangle
+    if( det < 0.0001 )
+        return false;
+
+    // Calculate u and make sure u <= 1
+    float u = dot(T , P);
+    if( u < 0.0 || u > det )
+        return false;
+
+    // Q
+    vec3 Q = cross(T,E1);
+
+    // Calculate v and make sure u + v <= 1
+    float v = dot(eyeRay.dir , Q);
+    if( v < 0.0 || u + v > det )
+        return false;
+
+    // Calculate t, scale parameters, ray intersects triangle
+    float t = dot(E2 , Q);
+
+    float fInvDet = 1.0 / det;
+    t *= fInvDet;
+    u *= fInvDet;
+    v *= fInvDet;
+
+	hitPoint = eyeRay.origin + t * eyeRay.dir;
+
+	float tri[9];
+	tri[0] = tri1.x; tri[1] = tri1.y; tri[2] = tri1.z;
+	tri[3] = tri2.x; tri[4] = tri2.y; tri[5] = tri2.z;
+	tri[6] = tri3.x; tri[7] = tri3.y; tri[8] = tri3.z;
+	float a = (tri[4] - tri[1]) * (tri[8] - tri[2]) - (tri[7] - tri[1]) * (tri[5] - tri[2]);
+ 	float b = (tri[5] - tri[2]) * (tri[6] - tri[0]) - (tri[8] - tri[2]) * (tri[3] - tri[0]);
+ 	float c = (tri[3] - tri[0]) * (tri[7] - tri[1]) - (tri[6] - tri[0]) * (tri[4] - tri[1]);
+
+	normal = vec3(a,b,c);
+
+    return true;
+}
+
+bool lineFace(in vec3 m , in vec3 vl, in vec3 n, in vec3 vp,out vec3 hitP)
+{
+	float vpt = vp.x*vl.x + vp.y*vl.y + vp.z*vl.z;
+	if(vpt == 0.0)
+		return false;
+	float t = ((n.x - m.x)*vp.x + (n.y - m.y)*vp.y + (n.z-m.z)*vp.z)/vpt;
+	hitP.x = m.x + vl.x * t;
+	hitP.y = m.y + vl.y * t;
+	hitP.z = m.z + vl.z * t;
+	return true;
+}
+
+bool intersectOtach(in Ray eyeRay, out vec3 hitPoint, out vec3 normal,out float dist,out int mt){
+		dist = sqrt((room.max.x - room.min.x) * (room.max.x - room.min.x) + (room.max.y - room.min.y) * (room.max.y - room.min.y) + (room.max.z - room.min.z) * (room.max.z - room.min.z));
+		vec3 hitPointTri,normalTri;
+		bool hit = false;
+
+		for(int j = 0 ; j < 8 ; j += 1)
+			{
+				vec3 tri1,tri2,tri3;
+				{
+					tri1 = octahe[j];
+					tri2 = octahe[fToO(j+1)];
+					tri3 = vec3(octahe[fToO(j)].x+0.5,octahe[fToO(j)].y,octahe[fToO(j)].z);
+				}
+
+				if(IntersectTriangle(eyeRay,tri1,tri2,tri3,hitPointTri,normalTri))
+				{
+						float nowDist = sqrt((hitPointTri.x - eyeRay.origin.x)*(hitPointTri.x - eyeRay.origin.x) + (hitPointTri.y - eyeRay.origin.y)*(hitPointTri.y - eyeRay.origin.y) + (hitPointTri.z - eyeRay.origin.z)*(hitPointTri.z - eyeRay.origin.z));
+						if(nowDist < dist&& dot(hitPointTri - eyeRay.origin, eyeRay.dir) >0.0 ){
+							dist = nowDist;
+							hitPoint = hitPointTri;
+							normal = normalTri;
+							hit = true;
+							mt = 3;
+						}
+				}
+			}
+
+
+			for(int j = 0 ; j < 8 ; j += 1)
+			{
+				vec3 tri1,tri2,tri3;
+				{
+					tri1 = vec3(octahe[fToO(j)].x+0.5,0,0);
+					tri2 = vec3(octahe[fToO(j+1)].x+0.5,octahe[fToO(j+1)].y,octahe[fToO(j+1)].z);
+					tri3 = vec3(octahe[fToO(j)].x+0.5,octahe[fToO(j)].y,octahe[fToO(j)].z);
+				}
+
+				if(IntersectTriangle(eyeRay,tri1,tri2,tri3,hitPointTri,normalTri))
+				{
+						float nowDist = sqrt((hitPointTri.x - eyeRay.origin.x)*(hitPointTri.x - eyeRay.origin.x) + (hitPointTri.y - eyeRay.origin.y)*(hitPointTri.y - eyeRay.origin.y) + (hitPointTri.z - eyeRay.origin.z)*(hitPointTri.z - eyeRay.origin.z));
+						if(nowDist < dist&& dot(hitPointTri - eyeRay.origin, eyeRay.dir) >0.0 ){
+							dist = nowDist;
+							vec3 hitPointTriM;
+							if(lineFace(eyeRay.origin,eyeRay.dir,tri1,vec3(1,0,0),hitPointTriM))//hitPointTri;
+							hitPoint = vec3(-9.2,-0.5,-0.5);
+							normal = vec3(1,0,0);
+							hit = true;
+							mt = 0;
+						}
+				}
+			}
+
+		return hit;
+}
+
 bool intersectBox(in Ray eyeRay,Box box, out float dist){//ray box intersect
 	vec3 tMin = (box.min - eyeRay.origin) / eyeRay.dir;
 	vec3 tMax = (box.max - eyeRay.origin) / eyeRay.dir;
@@ -414,6 +556,16 @@ void Initialization(){
 	sphere[3] = Sphere(vec3(3, -9, -3.82265), 1.,0);
 	sphere[4] = Sphere(vec3(6, -8, 6), 2.,0);
 
+	//han
+	octahe[0] = vec3(-10,2,2);
+	octahe[1] = vec3(-10,3,1);
+	octahe[2] = vec3(-10,3,-1);
+	octahe[3] = vec3(-10,2,-2);
+	octahe[4] = vec3(-10,-2,-2);
+	octahe[5] = vec3(-10,-3,-1);
+	octahe[6] = vec3(-10,-3,1);
+	octahe[7] = vec3(-10,-2,2);
+
 	// Initialize lights
 	lights[0] = Light(vec3(0, 10, 0), 0.5 /*size*/, true, LIGHT_AREA, 1., 1.);
 	lights[0] = Light(vec3(-10, 10, 10), 0.5 /*size*/, false, LIGHT_AREA, 1., 1.);
@@ -430,6 +582,8 @@ vec3 intersect(Ray eyeRay){//main ray bounce function
 	Hit hit;
 	float mDist = INFINITY, dist, alpha = 1.;
 	Ray newRay;
+	vec3 hitOP,hitON,hitMOP,hitMON;
+	int Omit;
 	for(int i = 0; i < BOUNCE; i++){
 		bounceTime = i;
 		mDist = INFINITY;
@@ -437,6 +591,11 @@ vec3 intersect(Ray eyeRay){//main ray bounce function
 		// hit spheres
 		if(hitSomething(eyeRay, hit, false)){
 			//nothing to do
+		}
+		else if(intersectOtach(eyeRay,hitOP,hitON,dist,Omit)){
+			hit.pos = hitOP;
+			hit.norm = hitON;
+			hit.mt = Omit;
 		}
 		//hit bounding box
 		else{//intersect room return the distance between ray origin and hit spot
