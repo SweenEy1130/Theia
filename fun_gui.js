@@ -5,11 +5,6 @@ var Gui = {
 	time : -1,
 	sampleCount: 0,//when there is no motion, samplecount increase with frames rendered to achieve antialiasing.
 	timeStart : 0,
-	timeLast : 0,
-	timeAccumulate:0,
-	timePrev20 : 0,
-	prevCounter : 0,
-	stop : 0,
 	lookAt:[0,0,1],
 	rotate:[0,0,0],
 	up : [0,1,0],
@@ -64,29 +59,30 @@ var Gui = {
 	getLeftRightVector : function(dir) {
 		var f = this.normalize(Gui.lookAt);
 		var vertical = this.crossProduct(f,Gui.up);
-		if (dir == 0)//left
+		// if (dir == 0)//left
+		// {
+		// 	// if (Gui.lookAt[2]>0)//facing inside
+		// 	// {
+		// 	// 	if (vertical[0] > 0)
+		// 	// 		vertical = math.multiply(vertical,-1);
+		// 	// }
+		// 	// else {
+		// 	// 	if (vertical[0] < 0)
+		// 	// 		vertical = math.multiply(vertical,-1);
+		// 	// }
+		// }
+		if (dir == 0) //left
 		{
-			if (Gui.lookAt[2]>0)//facing inside
-			{
-				if (vertical[0] > 0)
-					vertical = math.multiply(vertical,-1);
-			}
-			else {
-				if (vertical[0] < 0)
-					vertical = math.multiply(vertical,-1);
-			}
-		}
-		else //right
-		{
-			if (Gui.lookAt[2]>0)//facing inside
-			{
-				if (vertical[0] < 0)
-					vertical = math.multiply(vertical,-1);
-			}
-			else {
-				if (vertical[0] > 0)
-					vertical = math.multiply(vertical,-1);
-			}
+			// if (Gui.lookAt[2]>0)//facing inside
+			// {
+			// 	if (vertical[0] < 0)
+			// 		vertical = math.multiply(vertical,-1);
+			// }
+			// else {
+			// 	if (vertical[0] > 0)
+			// 		vertical = math.multiply(vertical,-1);
+			// }
+			vertical = math.multiply(vertical,-1);
 		}
 		vertical = this.normalize(vertical);
 		return vertical;
@@ -162,17 +158,40 @@ var Gui = {
 				Gui.sampleCount = 0;
 				break;
 			case 65://a
-				var vec = Gui.getLeftRightVector(0);
-				Camera.pos[0] += vec[0]*0.1;
-				Camera.pos[1] += vec[1]*0.1;
-				Camera.pos[2] += vec[2]*0.1;
+				//var vec = Gui.getLeftRightVector(0);
+				var vec;
+				if (Gui.lookAt[2]>=0)
+				{
+					vec = Gui.getLeftRightVector(0);
+					Camera.pos[0] -= vec[0]*0.1;
+					Camera.pos[1] -= vec[1]*0.1;
+					Camera.pos[2] -= vec[2]*0.1;
+				}
+				else
+				{
+					vec = Gui.getLeftRightVector(1);
+					Camera.pos[0] += vec[0]*0.1;
+					Camera.pos[1] += vec[1]*0.1;
+					Camera.pos[2] += vec[2]*0.1;
+				}
 				Gui.sampleCount = 0;
 				break;
 			case 68://d
-				var vec = Gui.getLeftRightVector(1);
-				Camera.pos[0] += vec[0]*0.1;
-				Camera.pos[1] += vec[1]*0.1;
-				Camera.pos[2] += vec[2]*0.1;
+
+				var vec;
+				if (Gui.lookAt[2] >= 0)
+				{
+					vec = Gui.getLeftRightVector(1);
+					Camera.pos[0] -= vec[0]*0.1;
+					Camera.pos[1] -= vec[1]*0.1;
+					Camera.pos[2] -= vec[2]*0.1;
+				}
+				else {
+					vec = Gui.getLeftRightVector(0);
+					Camera.pos[0] += vec[0]*0.1;
+					Camera.pos[1] += vec[1]*0.1;
+					Camera.pos[2] += vec[2]*0.1;
+				}
 				Gui.sampleCount = 0;
 				break;
 
@@ -251,16 +270,10 @@ var Gui = {
 		gl.bindTexture(gl.TEXTURE_2D, null);
 	},
 	animate : function(time) {
-		Gui.prevCounter++;
-		if (Gui.prevCounter == 20){
-			document.getElementById("fps").innerHTML = "fps:\t" + (20000/(Date.now() - Gui.timePrev20)).toFixed(1);
-			Gui.timePrev20 = Date.now();
-			Gui.prevCounter = 0;
-		}
-		Gui.timeNow = Date.now();
 		Gui.renderToBuffer();
 		Gui.drawToScreen();
 		gl.flush();
 		window.requestAnimationFrame(Gui.animate);
+
   }
 }
